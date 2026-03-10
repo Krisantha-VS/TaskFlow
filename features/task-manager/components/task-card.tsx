@@ -140,9 +140,16 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-3 ml-6">
-        <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', priority.classes)}>
-          {priority.label}
-        </span>
+        <div className="flex items-center gap-1.5">
+          <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', priority.classes)}>
+            {priority.label}
+          </span>
+          {task.recurrence && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+              ↻ {task.recurrence}
+            </span>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {due ? (
             <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${due.className}`}>

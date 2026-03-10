@@ -47,6 +47,7 @@ export async function POST(req: NextRequest) {
         status:      body.status   ?? 'todo',
         priority:    body.priority ?? 'medium',
         dueDate:     body.due_date ? new Date(body.due_date) : null,
+        recurrence:  body.recurrence ?? null,
       },
     });
     logActivity({ boardId: body.board_id, userId, action: 'created', taskId: task.id, detail: task.title });

@@ -28,6 +28,8 @@ model Task {
   priority    Priority  @default(medium)
   position    Int       @default(0)
   dueDate     DateTime?
+  recurrence  String?   @db.VarChar(20)
+  nextOccurrence DateTime?
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
   board       Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)

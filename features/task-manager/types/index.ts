@@ -47,6 +47,8 @@ export interface Task {
   priority: TaskPriority;
   position: number;
   due_date: string | null; // Fix T2: required, nullable, not optional
+  recurrence?: 'daily' | 'weekly' | 'monthly' | null;
+  next_occurrence?: string | null;
   created_at: string;
   updated_at: string;
   labels?: Label[];

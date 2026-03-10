@@ -10,6 +10,7 @@ export const BoardUpdateSchema = z.object({
 
 const STATUS = ['todo', 'in_progress', 'done'] as const;
 const PRIORITY = ['low', 'medium', 'high'] as const;
+const RECURRENCE = ['daily', 'weekly', 'monthly'] as const;
 
 export const TaskCreateSchema = z.object({
   board_id: z.number({ error: 'board_id required' }).int().positive(),
@@ -18,6 +19,7 @@ export const TaskCreateSchema = z.object({
   status: z.enum(STATUS).optional(),
   priority: z.enum(PRIORITY).optional(),
   due_date: z.string().datetime({ offset: true }).optional().nullable(),
+  recurrence: z.enum(RECURRENCE).optional().nullable(),
 });
 
 export const TaskUpdateSchema = z.object({
@@ -27,6 +29,7 @@ export const TaskUpdateSchema = z.object({
   priority: z.enum(PRIORITY).optional(),
   position: z.number().int().min(0).optional(),
   due_date: z.string().datetime({ offset: true }).optional().nullable(),
+  recurrence: z.enum(RECURRENCE).optional().nullable(),
 });
 
 export const LabelCreateSchema = z.object({

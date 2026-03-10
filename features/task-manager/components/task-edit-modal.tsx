@@ -155,11 +155,12 @@ interface Props {
 }
 
 export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask, comments = [], onAddComment, onDeleteComment }: Props) {
-  const [title, setTitle]       = useState(task.title);
-  const [description, setDesc]  = useState(task.description ?? '');
-  const [priority, setPriority] = useState(task.priority);
-  const [dueDate, setDueDate]   = useState(task.due_date ?? '');
-  const [saving, setSaving]     = useState(false);
+  const [title, setTitle]             = useState(task.title);
+  const [description, setDesc]        = useState(task.description ?? '');
+  const [priority, setPriority]       = useState(task.priority);
+  const [dueDate, setDueDate]         = useState(task.due_date ?? '');
+  const [recurrence, setRecurrence]   = useState<'daily' | 'weekly' | 'monthly' | null>(task.recurrence ?? null);
+  const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null); // Fix K3
 
   const firstInputRef = useRef<HTMLInputElement>(null);
@@ -222,6 +223,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
     }
     if (priority !== task.priority) changes.priority = priority;
     if (dueDate  !== (task.due_date ?? '')) changes.due_date = dueDate || null;
+    if (recurrence !== (task.recurrence ?? null)) changes.recurrence = recurrence;
 
     // Fix K3: try/catch so saving spinner clears on error; don't close on failure
     try {
@@ -313,6 +315,21 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 className="w-full bg-background/50 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary/60 transition-colors"
               />
             </div>
+          </div>
+
+          {/* Recurrence */}
+          <div className="flex items-center gap-3">
+            <label className="text-xs font-medium text-muted-foreground w-20 shrink-0">Repeat</label>
+            <select
+              value={recurrence ?? ''}
+              onChange={e => setRecurrence((e.target.value || null) as 'daily' | 'weekly' | 'monthly' | null)}
+              className="flex-1 px-3 py-2 rounded-lg bg-background border border-border text-sm outline-none focus:border-primary transition-colors"
+            >
+              <option value="">Never</option>
+              <option value="daily">Daily</option>
+              <option value="weekly">Weekly</option>
+              <option value="monthly">Monthly</option>
+            </select>
           </div>
 
           {/* Subtasks */}
