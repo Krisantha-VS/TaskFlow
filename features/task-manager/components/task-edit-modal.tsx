@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { type Task, type Label, type ActivityLog, type Subtask, PRIORITY_CONFIG } from '../types';
+import { type Task, type Label, type ActivityLog, type Subtask, type Comment, PRIORITY_CONFIG } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -101,6 +101,40 @@ function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: 
   );
 }
 
+function CommentInput({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
+  const [text, setText] = useState('');
+  const [saving, setSaving] = useState(false);
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setSaving(true);
+    await onAdd(text.trim());
+    setText('');
+    setSaving(false);
+  };
+
+  return (
+    <div className="flex gap-2">
+      <textarea
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+        placeholder="Write a comment… (Enter to send)"
+        rows={2}
+        className="flex-1 px-3 py-2 text-xs rounded-lg bg-background border border-border outline-none focus:border-primary transition-colors resize-none"
+      />
+      <button
+        type="button"
+        disabled={!text.trim() || saving}
+        onClick={submit}
+        className="px-3 py-2 text-xs rounded-lg bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity self-end"
+      >
+        Send
+      </button>
+    </div>
+  );
+}
+
 interface Props {
   task: Task;
   onSave: (id: number, data: Partial<Task>) => Promise<void>;
@@ -115,9 +149,12 @@ interface Props {
   onCreateSubtask?: (title: string) => Promise<void>;
   onToggleSubtask?: (id: number, completed: boolean) => Promise<void>;
   onDeleteSubtask?: (id: number) => Promise<void>;
+  comments?: Comment[];
+  onAddComment?: (text: string) => Promise<void>;
+  onDeleteComment?: (id: number) => Promise<void>;
 }
 
-export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask }: Props) {
+export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask, comments = [], onAddComment, onDeleteComment }: Props) {
   const [title, setTitle]       = useState(task.title);
   const [description, setDesc]  = useState(task.description ?? '');
   const [priority, setPriority] = useState(task.priority);
@@ -373,6 +410,49 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               <ActivityFeed logs={activity} loading={activityLoading} />
             </div>
           </details>
+        )}
+
+        {/* Comments */}
+        {(onAddComment || onDeleteComment || comments.length > 0) && (
+          <div className="border-t border-border pt-4 mt-2 px-6">
+            <p className="text-xs font-medium text-muted-foreground mb-3">
+              Comments {comments.length > 0 && <span className="text-muted-foreground/60">({comments.length})</span>}
+            </p>
+
+            {/* Comment list */}
+            <div className="space-y-3 mb-3 max-h-48 overflow-y-auto">
+              {comments.map(c => (
+                <div key={c.id} className="flex gap-2 group">
+                  <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
+                    <span className="text-[10px] font-semibold text-primary">U</span>
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs text-foreground/90 break-words">{c.text}</p>
+                    <div className="flex items-center gap-2 mt-1">
+                      <span className="text-[10px] text-muted-foreground/60">
+                        {new Date(c.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                      {onDeleteComment && (
+                        <button
+                          type="button"
+                          onClick={() => onDeleteComment(c.id)}
+                          className="text-[10px] text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                        >
+                          delete
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {comments.length === 0 && (
+                <p className="text-xs text-muted-foreground/50 italic">No comments yet.</p>
+              )}
+            </div>
+
+            {/* Add comment */}
+            {onAddComment && <CommentInput onAdd={onAddComment} />}
+          </div>
         )}
 
         {/* Actions */}

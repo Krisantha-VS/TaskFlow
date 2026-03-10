@@ -50,6 +50,15 @@ export interface ActivityLog {
   createdAt: string;
 }
 
+export interface Comment {
+  id: number;
+  taskId: number;
+  userId: string;
+  text: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export const COLUMNS: { key: TaskStatus; label: string; color: string }[] = [
   { key: 'todo',        label: 'To Do',       color: 'border-t-slate-400'  },
   { key: 'in_progress', label: 'In Progress', color: 'border-t-amber-400'  },

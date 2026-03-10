@@ -32,6 +32,7 @@ model Task {
   board       Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
   labels      Label[]   @relation("TaskLabels")
   subtasks    Subtask[]
+  comments    Comment[]
 
   @@index([userId])
   @@index([boardId, status])
@@ -84,4 +85,16 @@ model Subtask {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId])
+}
+
+model Comment {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  userId    String
+  text      String   @db.Text
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId, createdAt])
 }

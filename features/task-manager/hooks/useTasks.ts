@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '../api';
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment } from '../types';
 
 export function useTasks(token: string | null, boardId: number | null) {
   const [tasks, setTasks]               = useState<Task[]>([]);
@@ -198,7 +198,33 @@ export function useTasks(token: string | null, boardId: number | null) {
     } catch { /* ignore */ }
   }, [token]);
 
-  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, reload: load };
+  const [comments, setComments] = useState<Record<number, Comment[]>>({});
+
+  const fetchComments = useCallback(async (taskId: number) => {
+    if (!token) return;
+    try {
+      const data = await taskApi.getComments(token, taskId);
+      setComments(prev => ({ ...prev, [taskId]: data }));
+    } catch { /* non-critical */ }
+  }, [token]);
+
+  const addComment = useCallback(async (taskId: number, text: string) => {
+    if (!token) return;
+    try {
+      const comment = await taskApi.createComment(token, taskId, text);
+      setComments(prev => ({ ...prev, [taskId]: [...(prev[taskId] ?? []), comment] }));
+    } catch { /* ignore */ }
+  }, [token]);
+
+  const deleteComment = useCallback(async (taskId: number, commentId: number) => {
+    if (!token) return;
+    setComments(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(c => c.id !== commentId) }));
+    try {
+      await taskApi.deleteComment(token, commentId);
+    } catch { /* ignore */ }
+  }, [token]);
+
+  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, reload: load };
 }
 
 export function useBoards(token: string | null) {

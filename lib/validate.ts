@@ -47,3 +47,7 @@ export const SubtaskUpdateSchema = z.object({
   completed: z.boolean().optional(),
   position:  z.number().int().min(0).optional(),
 });
+
+export const CommentCreateSchema = z.object({
+  text: z.string().min(1, 'Comment cannot be empty').max(2000).trim(),
+});

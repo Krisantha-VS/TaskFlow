@@ -46,7 +46,7 @@ interface Toast {
 let _toastId = 0;
 
 export function KanbanBoard({ token, boardId }: Props) {
-  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask } = useTasks(token, boardId);
+  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask]   = useState<Task | null>(null);
 
@@ -264,7 +264,7 @@ export function KanbanBoard({ token, boardId }: Props) {
             }}
             onStatusChange={moveTask}
             onAddTask={handleAddTask} // Fix K5
-            onEdit={task => { setEditingTask(task); fetchActivity(task.id); fetchSubtasks(task.id); }}
+            onEdit={task => { setEditingTask(task); fetchActivity(task.id); fetchSubtasks(task.id); fetchComments(task.id); }}
             selected={selected}
             onToggleSelect={toggleSelect}
             onSelectAll={(ids) => setSelected(prev => new Set([...prev, ...ids]))}
@@ -287,6 +287,9 @@ export function KanbanBoard({ token, boardId }: Props) {
           onCreateSubtask={(title) => createSubtask(editingTask.id, title)}
           onToggleSubtask={(id, completed) => toggleSubtask(editingTask.id, id, completed)}
           onDeleteSubtask={(id) => deleteSubtask(editingTask.id, id)}
+          comments={comments[editingTask.id] ?? []}
+          onAddComment={(text) => addComment(editingTask.id, text)}
+          onDeleteComment={(id) => deleteComment(editingTask.id, id)}
         />
       )}
 

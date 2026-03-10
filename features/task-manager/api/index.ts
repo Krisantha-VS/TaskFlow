@@ -1,4 +1,4 @@
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment } from '../types';
 import { authFetch } from '../lib/auth-fetch';
 
 const BASE = '/api';
@@ -60,4 +60,13 @@ export const taskApi = {
     req<Subtask>(`subtasks/${id}`, 'PATCH', data, token),
   deleteSubtask: (token: string, id: number) =>
     req<null>(`subtasks/${id}`, 'DELETE', undefined, token),
+
+  getComments:   (token: string, taskId: number) =>
+    req<Comment[]>(`tasks/${taskId}/comments`, 'GET', undefined, token),
+  createComment: (token: string, taskId: number, text: string) =>
+    req<Comment>(`tasks/${taskId}/comments`, 'POST', { text }, token),
+  updateComment: (token: string, id: number, text: string) =>
+    req<Comment>(`comments/${id}`, 'PATCH', { text }, token),
+  deleteComment: (token: string, id: number) =>
+    req<null>(`comments/${id}`, 'DELETE', undefined, token),
 };
