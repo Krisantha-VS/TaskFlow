@@ -4,6 +4,7 @@ import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { TaskUpdateSchema } from '@/lib/validate';
+import { logActivity } from '@/lib/activity';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -34,6 +35,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     // FIX: use updateMany with userId in where to prevent TOCTOU, then re-fetch
     await db.task.updateMany({ where: { id, userId }, data: update });
     const updated = await db.task.findFirst({ where: { id, userId } });
+    const changes = Object.keys(update).join(', ');
+    logActivity({ boardId: task.boardId, userId, action: 'updated', taskId: id, detail: changes });
     return ok(updated);
   } catch (e) {
     return handleError(e);
@@ -49,6 +52,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     const task = await db.task.findFirst({ where: { id, userId } });
     if (!task) return fail('Task not found', 404);
     await db.task.delete({ where: { id } });
+    logActivity({ boardId: task.boardId, userId, action: 'deleted', taskId: id, detail: task.title });
     return ok(null);
   } catch (e) {
     return handleError(e);

@@ -28,3 +28,12 @@ export const TaskUpdateSchema = z.object({
   position: z.number().int().min(0).optional(),
   due_date: z.string().datetime({ offset: true }).optional().nullable(),
 });
+
+export const LabelCreateSchema = z.object({
+  name:  z.string().min(1).max(50).trim(),
+  color: z.enum(['blue','green','red','yellow','purple','pink','orange','gray']).default('blue'),
+});
+
+export const TaskLabelSchema = z.object({
+  labelId: z.number().int().positive(),
+});

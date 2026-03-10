@@ -4,6 +4,7 @@ import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { BoardCreateSchema } from '@/lib/validate';
+import { logActivity } from '@/lib/activity';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest) {
     if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const body = BoardCreateSchema.parse(await req.json());
     const board = await db.board.create({ data: { userId, name: body.name } });
+    logActivity({ boardId: board.id, userId, action: 'board_created', detail: board.name });
     return ok(board, 201);
   } catch (e) {
     return handleError(e);

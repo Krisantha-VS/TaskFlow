@@ -2,16 +2,85 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { type Task, PRIORITY_CONFIG } from '../types';
+import { type Task, type Label, type ActivityLog, PRIORITY_CONFIG } from '../types';
 import { cn } from '@/lib/utils';
+import { LabelPill } from '@/components/label-pill';
+import { ActivityFeed } from '@/components/activity-feed';
+
+const COLORS = ['blue','green','red','yellow','purple','pink','orange','gray'] as const;
+
+const COLOR_DOT: Record<string, string> = {
+  blue:   'bg-blue-500',
+  green:  'bg-green-500',
+  red:    'bg-red-500',
+  yellow: 'bg-yellow-500',
+  purple: 'bg-purple-500',
+  pink:   'bg-pink-500',
+  orange: 'bg-orange-500',
+  gray:   'bg-gray-500',
+};
+
+function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: string) => Promise<void> }) {
+  const [open, setOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [color, setColor] = useState<string>('blue');
+  const [saving, setSaving] = useState(false);
+
+  if (!open) return (
+    <button type="button" onClick={() => setOpen(true)} className="mt-2 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors">
+      + New label
+    </button>
+  );
+
+  return (
+    <div className="mt-2 flex items-center gap-2 flex-wrap">
+      <input
+        autoFocus
+        value={name}
+        onChange={e => setName(e.target.value)}
+        placeholder="Label name"
+        className="flex-1 min-w-0 px-2 py-1 text-xs rounded-md bg-background border border-border outline-none focus:border-primary"
+      />
+      <div className="flex gap-1">
+        {COLORS.map(c => (
+          <button
+            key={c}
+            type="button"
+            onClick={() => setColor(c)}
+            className={`w-4 h-4 rounded-full ${COLOR_DOT[c]} ring-2 ring-offset-1 ring-offset-background transition-all ${color === c ? 'ring-white' : 'ring-transparent'}`}
+          />
+        ))}
+      </div>
+      <button
+        type="button"
+        disabled={!name.trim() || saving}
+        onClick={async () => {
+          setSaving(true);
+          await onCreateLabel(name.trim(), color);
+          setName(''); setOpen(false); setSaving(false);
+        }}
+        className="text-xs px-2 py-1 rounded-md bg-primary text-primary-foreground disabled:opacity-50"
+      >
+        Add
+      </button>
+      <button type="button" onClick={() => { setOpen(false); setName(''); }} className="text-xs text-muted-foreground hover:text-foreground">Cancel</button>
+    </div>
+  );
+}
 
 interface Props {
   task: Task;
   onSave: (id: number, data: Partial<Task>) => Promise<void>;
   onClose: () => void;
+  labels?: Label[];
+  onAddLabel?: (labelId: number) => void;
+  onRemoveLabel?: (labelId: number) => void;
+  onCreateLabel?: (name: string, color: string) => Promise<void>;
+  activity?: ActivityLog[];
+  activityLoading?: boolean;
 }
 
-export function TaskEditModal({ task, onSave, onClose }: Props) {
+export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading }: Props) {
   const [title, setTitle]       = useState(task.title);
   const [description, setDesc]  = useState(task.description ?? '');
   const [priority, setPriority] = useState(task.priority);
@@ -171,7 +240,47 @@ export function TaskEditModal({ task, onSave, onClose }: Props) {
               />
             </div>
           </div>
+
+          {/* Labels */}
+          {(onAddLabel || onRemoveLabel || onCreateLabel) && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-2">Labels</label>
+              {/* Current labels on task */}
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {(task.labels ?? []).map(l => (
+                  <LabelPill key={l.id} name={l.name} color={l.color} onRemove={onRemoveLabel ? () => onRemoveLabel(l.id) : undefined} />
+                ))}
+              </div>
+              {/* Available labels to add */}
+              <div className="flex flex-wrap gap-1.5">
+                {labels.filter(l => !(task.labels ?? []).find(tl => tl.id === l.id)).map(l => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    onClick={() => onAddLabel && onAddLabel(l.id)}
+                    className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full border border-dashed border-border hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    + {l.name}
+                  </button>
+                ))}
+              </div>
+              {/* Create new label inline */}
+              {onCreateLabel && <NewLabelForm onCreateLabel={onCreateLabel} />}
+            </div>
+          )}
         </div>
+
+        {/* Activity */}
+        {activity !== undefined && (
+          <details className="border-t border-border pt-4 mt-2 px-6">
+            <summary className="text-xs font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors select-none">
+              Activity ({activity.length})
+            </summary>
+            <div className="mt-2 max-h-40 overflow-y-auto">
+              <ActivityFeed logs={activity} loading={activityLoading} />
+            </div>
+          </details>
+        )}
 
         {/* Actions */}
         <div className="px-6 pb-5 space-y-3">

@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar } from 'lucide-react';
 import { type Task, PRIORITY_CONFIG, COLUMNS } from '../types';
 import { cn } from '@/lib/utils';
+import { LabelPill } from '@/components/label-pill';
 
 interface Props {
   task: Task;
@@ -97,6 +98,15 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
           {expanded && (
             <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{task.description}</p>
           )}
+        </div>
+      )}
+
+      {/* Labels */}
+      {task.labels && task.labels.length > 0 && (
+        <div className="flex flex-wrap gap-1 mt-1.5 ml-6">
+          {task.labels.map(l => (
+            <LabelPill key={l.id} name={l.name} color={l.color} small />
+          ))}
         </div>
       )}
 

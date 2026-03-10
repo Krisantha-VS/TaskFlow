@@ -23,7 +23,7 @@ interface Toast {
 let _toastId = 0;
 
 export function KanbanBoard({ token, boardId }: Props) {
-  const { tasks, loading, error, createTask, updateTask, moveTask, deleteTask } = useTasks(token, boardId);
+  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask]   = useState<Task | null>(null);
 
@@ -152,7 +152,7 @@ export function KanbanBoard({ token, boardId }: Props) {
             }}
             onStatusChange={moveTask}
             onAddTask={handleAddTask} // Fix K5
-            onEdit={task => setEditingTask(task)}
+            onEdit={task => { setEditingTask(task); fetchActivity(task.id); }}
           />
         ))}
       </div>
@@ -162,6 +162,12 @@ export function KanbanBoard({ token, boardId }: Props) {
           task={editingTask}
           onSave={async (id, data) => { await updateTask(id, data); }}
           onClose={() => setEditingTask(null)}
+          labels={labels}
+          onAddLabel={(labelId) => addTaskLabel(editingTask.id, labelId)}
+          onRemoveLabel={(labelId) => removeTaskLabel(editingTask.id, labelId)}
+          onCreateLabel={createLabel}
+          activity={activity}
+          activityLoading={activityLoading}
         />
       )}
 

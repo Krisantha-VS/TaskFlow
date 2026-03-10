@@ -1,4 +1,4 @@
-import type { Board, Task, TaskStatus, TaskPriority } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog } from '../types';
 import { authFetch } from '../lib/auth-fetch';
 
 const BASE = '/api';
@@ -37,4 +37,18 @@ export const taskApi = {
     req<Task>(`tasks/${id}`, 'PATCH', data, token),
   deleteTask: (token: string, id: number) =>
     req<null>(`tasks/${id}`, 'DELETE', undefined, token),
+
+  getLabels:   (token: string, boardId: number) =>
+    req<Label[]>(`labels?board_id=${boardId}`, 'GET', undefined, token),
+  createLabel: (token: string, boardId: number, name: string, color: string) =>
+    req<Label>('labels', 'POST', { board_id: boardId, name, color }, token),
+  deleteLabel: (token: string, id: number) =>
+    req<null>(`labels/${id}`, 'DELETE', undefined, token),
+  addTaskLabel: (token: string, taskId: number, labelId: number) =>
+    req<unknown>(`tasks/${taskId}/labels`, 'POST', { labelId }, token),
+  removeTaskLabel: (token: string, taskId: number, labelId: number) =>
+    req<null>(`tasks/${taskId}/labels`, 'DELETE', { labelId }, token),
+
+  getActivity: (token: string, boardId: number) =>
+    req<ActivityLog[]>(`activity?board_id=${boardId}`, 'GET', undefined, token),
 };

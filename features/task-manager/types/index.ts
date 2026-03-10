@@ -1,6 +1,13 @@
 export type TaskStatus   = 'todo' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export interface Label {
+  id: number;
+  boardId: number;
+  name: string;
+  color: string;
+}
+
 export interface Board {
   id: number;
   user_id: string;
@@ -20,6 +27,17 @@ export interface Task {
   due_date: string | null; // Fix T2: required, nullable, not optional
   created_at: string;
   updated_at: string;
+  labels?: Label[];
+}
+
+export interface ActivityLog {
+  id: number;
+  taskId: number | null;
+  boardId: number;
+  userId: string;
+  action: string;
+  detail: string | null;
+  createdAt: string;
 }
 
 export const COLUMNS: { key: TaskStatus; label: string; color: string }[] = [

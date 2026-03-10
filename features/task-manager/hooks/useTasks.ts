@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '../api';
-import type { Board, Task, TaskStatus, TaskPriority } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog } from '../types';
 
 export function useTasks(token: string | null, boardId: number | null) {
   const [tasks, setTasks]               = useState<Task[]>([]);
+  const [labels, setLabels]             = useState<Label[]>([]);
   const [loading, setLoading]           = useState(false);
   const [error, setError]               = useState<string | null>(null);
   // Fix A6: mutation-level error state
@@ -16,8 +17,12 @@ export function useTasks(token: string | null, boardId: number | null) {
     setLoading(true);
     setError(null);
     try {
-      const data = await taskApi.getTasks(token, boardId);
-      setTasks(data);
+      const [tasksData, labelsData] = await Promise.all([
+        taskApi.getTasks(token, boardId),
+        taskApi.getLabels(token, boardId),
+      ]);
+      setTasks(tasksData);
+      setLabels(labelsData);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load tasks');
     } finally {
@@ -107,7 +112,49 @@ export function useTasks(token: string | null, boardId: number | null) {
     }
   };
 
-  return { tasks, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, reload: load };
+  const addTaskLabel = async (taskId: number, labelId: number): Promise<void> => {
+    if (!token) return;
+    await taskApi.addTaskLabel(token, taskId, labelId);
+    // Update local task labels state
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      const label = labels.find(l => l.id === labelId);
+      if (!label) return t;
+      const existing = t.labels ?? [];
+      if (existing.find(l => l.id === labelId)) return t;
+      return { ...t, labels: [...existing, label] };
+    }));
+  };
+
+  const removeTaskLabel = async (taskId: number, labelId: number): Promise<void> => {
+    if (!token) return;
+    await taskApi.removeTaskLabel(token, taskId, labelId);
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId) return t;
+      return { ...t, labels: (t.labels ?? []).filter(l => l.id !== labelId) };
+    }));
+  };
+
+  const createLabel = async (name: string, color: string): Promise<void> => {
+    if (!token || !boardId) return;
+    const label = await taskApi.createLabel(token, boardId, name, color);
+    setLabels(prev => [...prev, label].sort((a, b) => a.name.localeCompare(b.name)));
+  };
+
+  const [activity, setActivity] = useState<ActivityLog[]>([]);
+  const [activityLoading, setActivityLoading] = useState(false);
+
+  const fetchActivity = useCallback(async (taskId: number) => {
+    if (!token || !boardId) return;
+    setActivityLoading(true);
+    try {
+      const logs = await taskApi.getActivity(token, boardId);
+      setActivity(logs.filter(l => l.taskId === taskId || l.taskId === null));
+    } catch { /* non-critical */ }
+    finally { setActivityLoading(false); }
+  }, [token, boardId]);
+
+  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, reload: load };
 }
 
 export function useBoards(token: string | null) {

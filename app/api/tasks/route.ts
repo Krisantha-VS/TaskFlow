@@ -4,6 +4,7 @@ import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { TaskCreateSchema } from '@/lib/validate';
+import { logActivity } from '@/lib/activity';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -21,6 +22,7 @@ export async function GET(req: NextRequest) {
     if (!board) return fail('Board not found', 404);
     const tasks = await db.task.findMany({
       where: { boardId },
+      include: { labels: true },
       orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
     });
     return ok(tasks);
@@ -47,6 +49,7 @@ export async function POST(req: NextRequest) {
         dueDate:     body.due_date ? new Date(body.due_date) : null,
       },
     });
+    logActivity({ boardId: body.board_id, userId, action: 'created', taskId: task.id, detail: task.title });
     return ok(task, 201);
   } catch (e) {
     return handleError(e);
