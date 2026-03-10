@@ -14,6 +14,8 @@ interface Props {
   onDragStart: (e: React.DragEvent, task: Task) => void;
   onDragEnd: () => void; // Fix K1: required onDragEnd prop
   onEdit: (task: Task) => void; // Fix T3: required, not optional
+  isSelected?: boolean;
+  onToggleSelect?: (id: number) => void;
 }
 
 function getDueDateStyle(dueDate: string | null | undefined): { label: string; className: string } | null {
@@ -30,7 +32,7 @@ function getDueDateStyle(dueDate: string | null | undefined): { label: string; c
   return { label, className: 'text-muted-foreground bg-muted/50' };
 }
 
-export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onDragEnd, onEdit }: Props) {
+export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onDragEnd, onEdit, isSelected, onToggleSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
   const priority = PRIORITY_CONFIG[task.priority];
   const due = getDueDateStyle(task.due_date);
@@ -57,10 +59,23 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
         onEdit(task);
       }}
       className={cn(
-        'glass rounded-xl p-4 cursor-grab active:cursor-grabbing border border-border transition-all group',
-        isDragging && 'opacity-40 scale-95'
+        'relative glass rounded-xl p-4 cursor-grab active:cursor-grabbing border border-border transition-all group',
+        isDragging && 'opacity-40 scale-95',
+        isSelected && 'ring-1 ring-primary/40'
       )}
     >
+      {/* Selection checkbox */}
+      <button
+        onClick={e => { e.stopPropagation(); onToggleSelect?.(task.id); }}
+        className={`absolute top-2 left-2 w-4 h-4 rounded border flex items-center justify-center transition-all z-10 ${
+          isSelected
+            ? 'bg-primary border-primary opacity-100'
+            : 'border-border bg-background opacity-0 group-hover:opacity-100'
+        }`}
+      >
+        {isSelected && <span className="text-primary-foreground text-[10px] leading-none">✓</span>}
+      </button>
+
       {/* Header */}
       <div className="flex items-start gap-2">
         <GripVertical className="w-4 h-4 text-muted-foreground/40 mt-0.5 shrink-0" />

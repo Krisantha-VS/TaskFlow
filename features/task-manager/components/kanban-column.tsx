@@ -19,12 +19,16 @@ interface Props {
   onStatusChange: (id: number, status: TaskStatus) => void;
   onAddTask: (title: string, priority: Task['priority'], description: string) => void;
   onEdit: (task: Task) => void; // Fix T3: required, not optional
+  selected?: Set<number>;
+  onToggleSelect?: (id: number) => void;
+  onSelectAll?: (ids: number[]) => void;
 }
 
 export function KanbanColumn({
   status, label, colorClass, tasks,
   onDrop, onDragStart, onDragEnd, draggingId,
   onDelete, onStatusChange, onAddTask, onEdit,
+  selected, onToggleSelect, onSelectAll,
 }: Props) {
   const [dragOver, setDragOver] = useState(false);
   const [adding, setAdding]     = useState(false);
@@ -58,12 +62,18 @@ export function KanbanColumn({
       onDrop={handleDrop}
     >
       {/* Column header */}
-      <div className={cn('px-4 py-3 border-b-2 border-border flex items-center justify-between rounded-t-xl', colorClass)}>
+      <div className={cn('px-4 py-3 border-b-2 border-border flex items-center justify-between rounded-t-xl group', colorClass)}>
         <div className="flex items-center gap-2">
           <span className="text-sm font-semibold">{label}</span>
           <span className="text-xs bg-background/60 text-muted-foreground px-2 py-0.5 rounded-full">
             {tasks.length}
           </span>
+          <button
+            onClick={() => onSelectAll?.(tasks.map(t => t.id))}
+            className="opacity-0 group-hover:opacity-100 text-[10px] text-muted-foreground hover:text-foreground transition-all ml-auto"
+          >
+            Select all
+          </button>
         </div>
         {/* Fix AC1: aria-label on icon-only Plus button */}
         <button
@@ -87,6 +97,8 @@ export function KanbanColumn({
             onDragStart={onDragStart}
             onDragEnd={onDragEnd} // Fix K1: pass through
             onEdit={onEdit}
+            isSelected={selected?.has(task.id)}
+            onToggleSelect={onToggleSelect}
           />
         ))}
 

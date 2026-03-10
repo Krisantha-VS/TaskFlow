@@ -2,11 +2,34 @@
 
 import { useState } from 'react';
 import { Search } from 'lucide-react';
-import { COLUMNS, type Task, type TaskStatus } from '../types';
+import { COLUMNS, type Task, type TaskStatus, type TaskPriority } from '../types';
 import { KanbanColumn } from './kanban-column';
 import { TaskEditModal } from './task-edit-modal';
 import { useTasks } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+
+type SortKey = 'default' | 'priority' | 'due_date' | 'created';
+
+const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
+
+function sortTasks(tasks: Task[], key: SortKey): Task[] {
+  if (key === 'default') return tasks;
+  return [...tasks].sort((a, b) => {
+    if (key === 'priority') {
+      return (PRIORITY_ORDER[a.priority] ?? 1) - (PRIORITY_ORDER[b.priority] ?? 1);
+    }
+    if (key === 'due_date') {
+      if (!a.due_date && !b.due_date) return 0;
+      if (!a.due_date) return 1;
+      if (!b.due_date) return -1;
+      return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+    }
+    if (key === 'created') {
+      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+    }
+    return 0;
+  });
+}
 
 interface Props {
   token: string;
@@ -27,8 +50,23 @@ export function KanbanBoard({ token, boardId }: Props) {
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask]   = useState<Task | null>(null);
 
+  // Bulk selection state
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+
+  const toggleSelect = (id: number) =>
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+
+  const clearSelection = () => setSelected(new Set());
+
   // Search state
   const [search, setSearch] = useState('');
+
+  // Sort state
+  const [sortKey, setSortKey] = useState<SortKey>('default');
 
   // Task delete confirmation state
   const [confirmTask, setConfirmTask] = useState<{ id: number; title: string } | null>(null);
@@ -121,8 +159,8 @@ export function KanbanBoard({ token, boardId }: Props) {
 
   return (
     <>
-      {/* Search bar */}
-      <div className="mb-4 relative">
+      {/* Search bar + Sort control */}
+      <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="relative w-full max-w-sm">
           <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
           <input
@@ -132,7 +170,81 @@ export function KanbanBoard({ token, boardId }: Props) {
             className="w-full pl-9 pr-4 py-2 rounded-lg bg-background/80 border border-border text-sm outline-none focus:border-primary transition-colors"
           />
         </div>
+
+        <div className="flex items-center gap-1.5 ml-auto">
+          <span className="text-xs text-muted-foreground">Sort:</span>
+          <select
+            value={sortKey}
+            onChange={e => setSortKey(e.target.value as SortKey)}
+            className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 outline-none focus:border-primary transition-colors cursor-pointer"
+          >
+            <option value="default">Default</option>
+            <option value="priority">Priority</option>
+            <option value="due_date">Due date</option>
+            <option value="created">Newest</option>
+          </select>
+        </div>
       </div>
+
+      {/* Bulk action bar */}
+      {selected.size > 0 && (
+        <div className="flex items-center gap-3 mb-4 px-4 py-2.5 rounded-xl bg-primary/10 border border-primary/20 text-sm flex-wrap">
+          <span className="font-medium text-primary">{selected.size} selected</span>
+          <div className="flex items-center gap-2 ml-auto flex-wrap">
+            {/* Move to status */}
+            <select
+              defaultValue=""
+              onChange={async e => {
+                const status = e.target.value as TaskStatus;
+                if (!status) return;
+                await Promise.all([...selected].map(id => updateTask(id, { status })));
+                clearSelection();
+                e.target.value = '';
+              }}
+              className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 outline-none cursor-pointer"
+            >
+              <option value="">Move to…</option>
+              <option value="todo">Todo</option>
+              <option value="in_progress">In Progress</option>
+              <option value="done">Done</option>
+            </select>
+
+            {/* Change priority */}
+            <select
+              defaultValue=""
+              onChange={async e => {
+                const priority = e.target.value as TaskPriority;
+                if (!priority) return;
+                await Promise.all([...selected].map(id => updateTask(id, { priority })));
+                clearSelection();
+                e.target.value = '';
+              }}
+              className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 outline-none cursor-pointer"
+            >
+              <option value="">Set priority…</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+
+            {/* Bulk delete */}
+            <button
+              onClick={async () => {
+                if (!confirm(`Delete ${selected.size} tasks?`)) return;
+                await Promise.all([...selected].map(id => deleteTask(id)));
+                clearSelection();
+              }}
+              className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+            >
+              Delete {selected.size}
+            </button>
+
+            <button onClick={clearSelection} className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {COLUMNS.map(col => (
@@ -141,7 +253,7 @@ export function KanbanBoard({ token, boardId }: Props) {
             status={col.key}
             label={col.label}
             colorClass={col.color}
-            tasks={filtered.filter(t => t.status === col.key)}
+            tasks={sortTasks(filtered.filter(t => t.status === col.key), sortKey)}
             onDrop={handleDrop}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd} // Fix K1
@@ -153,6 +265,9 @@ export function KanbanBoard({ token, boardId }: Props) {
             onStatusChange={moveTask}
             onAddTask={handleAddTask} // Fix K5
             onEdit={task => { setEditingTask(task); fetchActivity(task.id); fetchSubtasks(task.id); }}
+            selected={selected}
+            onToggleSelect={toggleSelect}
+            onSelectAll={(ids) => setSelected(prev => new Set([...prev, ...ids]))}
           />
         ))}
       </div>
