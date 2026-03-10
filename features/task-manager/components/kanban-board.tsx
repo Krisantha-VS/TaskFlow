@@ -1,12 +1,13 @@
 'use client';
 
 import { useState } from 'react';
-import { Search } from 'lucide-react';
-import { COLUMNS, type Task, type TaskStatus, type TaskPriority } from '../types';
+import { Search, Columns } from 'lucide-react';
+import { DEFAULT_COLUMNS, type Board, type BoardColumn, type Task, type TaskStatus, type TaskPriority } from '../types';
 import { KanbanColumn } from './kanban-column';
 import { TaskEditModal } from './task-edit-modal';
 import { useTasks } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
+import { ColumnEditor } from '@/components/column-editor';
 
 type SortKey = 'default' | 'priority' | 'due_date' | 'created';
 
@@ -34,6 +35,8 @@ function sortTasks(tasks: Task[], key: SortKey): Task[] {
 interface Props {
   token: string;
   boardId: number;
+  board?: Board;
+  onColumnsUpdate?: (columns: BoardColumn[]) => Promise<void>;
 }
 
 // Fix K5: minimal toast type
@@ -45,10 +48,16 @@ interface Toast {
 
 let _toastId = 0;
 
-export function KanbanBoard({ token, boardId }: Props) {
+export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask] = useState<Task | null>(null);
   const [editingTask, setEditingTask]   = useState<Task | null>(null);
+
+  // Column editor state
+  const [editingColumns, setEditingColumns] = useState(false);
+
+  // Derive active columns from board prop, falling back to defaults
+  const columns: BoardColumn[] = (board?.columns as BoardColumn[] | null) ?? DEFAULT_COLUMNS;
 
   // Bulk selection state
   const [selected, setSelected] = useState<Set<number>>(new Set());
@@ -183,8 +192,25 @@ export function KanbanBoard({ token, boardId }: Props) {
             <option value="due_date">Due date</option>
             <option value="created">Newest</option>
           </select>
+
+          <button
+            onClick={() => setEditingColumns(v => !v)}
+            title="Manage columns"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Columns className="w-3.5 h-3.5" />
+            Columns
+          </button>
         </div>
       </div>
+
+      {editingColumns && onColumnsUpdate && (
+        <ColumnEditor
+          columns={columns}
+          onSave={async (cols) => { await onColumnsUpdate(cols); setEditingColumns(false); }}
+          onCancel={() => setEditingColumns(false)}
+        />
+      )}
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
@@ -246,13 +272,13 @@ export function KanbanBoard({ token, boardId }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {COLUMNS.map(col => (
+      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
+        {columns.map(col => (
           <KanbanColumn
             key={col.key}
-            status={col.key}
+            status={col.key as TaskStatus}
             label={col.label}
-            colorClass={col.color}
+            colorClass={col.color ?? ''}
             tasks={sortTasks(filtered.filter(t => t.status === col.key), sortKey)}
             onDrop={handleDrop}
             onDragStart={handleDragStart}

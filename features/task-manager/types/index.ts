@@ -1,6 +1,18 @@
 export type TaskStatus   = 'todo' | 'in_progress' | 'done';
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export interface BoardColumn {
+  key: string;
+  label: string;
+  color?: string;
+}
+
+export const DEFAULT_COLUMNS: BoardColumn[] = [
+  { key: 'todo',        label: 'Todo' },
+  { key: 'in_progress', label: 'In Progress' },
+  { key: 'done',        label: 'Done' },
+];
+
 export interface Label {
   id: number;
   boardId: number;
@@ -13,6 +25,7 @@ export interface Board {
   user_id: string;
   name: string;
   created_at: string;
+  columns?: BoardColumn[] | null;
 }
 
 export interface Subtask {

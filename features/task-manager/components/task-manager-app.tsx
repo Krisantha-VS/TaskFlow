@@ -271,7 +271,7 @@ function AuthGate({ login, register, loading, error, registrationSuccess }: Auth
 export function TaskManagerApp() {
   // Fix A1/A2: single useInlineAuth instance at the top level
   const { token, loading: authLoading, error: authError, registrationSuccess, login, register, logout } = useInlineAuth();
-  const { boards, loading: boardsLoading, error: boardsError, createBoard, deleteBoard } = useBoards(token);
+  const { boards, loading: boardsLoading, error: boardsError, createBoard, deleteBoard, updateBoardColumns } = useBoards(token);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
   const [newBoardName, setNewBoardName]   = useState('');
   const [addingBoard, setAddingBoard]     = useState(false);
@@ -469,7 +469,12 @@ export function TaskManagerApp() {
                 <h1 className="text-xl font-bold">{activeBoard.name}</h1>
                 <p className="text-sm text-muted-foreground">Drag tasks between columns to update status</p>
               </div>
-              <KanbanBoard token={token} boardId={activeBoard.id} />
+              <KanbanBoard
+                token={token}
+                boardId={activeBoard.id}
+                board={activeBoard}
+                onColumnsUpdate={(cols) => updateBoardColumns(activeBoard.id, cols)}
+              />
             </>
           ) : (
             <div className="flex flex-col items-center justify-center h-full text-center gap-4">

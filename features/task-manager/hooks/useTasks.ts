@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '../api';
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn } from '../types';
 
 export function useTasks(token: string | null, boardId: number | null) {
   const [tasks, setTasks]               = useState<Task[]>([]);
@@ -262,6 +262,14 @@ export function useBoards(token: string | null) {
     setBoards(prev => prev.filter(b => b.id !== id));
   };
 
+  const updateBoardColumns = useCallback(async (boardId: number, columns: BoardColumn[]) => {
+    if (!token) return;
+    try {
+      const updated = await taskApi.updateBoardColumns(token, boardId, columns);
+      setBoards(prev => prev.map(b => b.id === boardId ? { ...b, columns: updated.columns } : b));
+    } catch { /* ignore */ }
+  }, [token]);
+
   // Fix A5: return error from hook
-  return { boards, loading, error, createBoard, deleteBoard };
+  return { boards, loading, error, createBoard, deleteBoard, updateBoardColumns };
 }

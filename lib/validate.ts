@@ -51,3 +51,10 @@ export const SubtaskUpdateSchema = z.object({
 export const CommentCreateSchema = z.object({
   text: z.string().min(1, 'Comment cannot be empty').max(2000).trim(),
 });
+
+export const BoardColumnSchema = z.object({
+  key:   z.string().min(1).max(30),
+  label: z.string().min(1).max(50),
+  color: z.string().optional(),
+});
+export const BoardColumnsSchema = z.array(BoardColumnSchema).min(1).max(5);

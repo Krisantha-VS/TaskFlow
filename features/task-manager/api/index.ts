@@ -1,4 +1,4 @@
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn } from '../types';
 import { authFetch } from '../lib/auth-fetch';
 
 const BASE = '/api';
@@ -28,6 +28,8 @@ export const taskApi = {
     req<Board>(`boards/${id}`, 'PATCH', { name }, token),
   deleteBoard: (token: string, id: number) =>
     req<null>(`boards/${id}`, 'DELETE', undefined, token),
+  updateBoardColumns: (token: string, boardId: number, columns: BoardColumn[]) =>
+    req<Board>(`boards/${boardId}/columns`, 'PUT', columns, token),
 
   getTasks:   (token: string, boardId: number) =>
     req<Task[]>(`tasks?board_id=${boardId}`, 'GET', undefined, token),
