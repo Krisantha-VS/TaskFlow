@@ -166,6 +166,18 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   const firstInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
+  // Sync fields if the task prop updates externally (e.g. label/subtask mutations refresh the task)
+  // Only sync fields that are not currently being edited (i.e. when not saving)
+  useEffect(() => {
+    if (saving) return;
+    setTitle(task.title);
+    setDesc(task.description ?? '');
+    setPriority(task.priority);
+    setDueDate(task.due_date ?? '');
+    setRecurrence(task.recurrence ?? null);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [task.title, task.description, task.priority, task.due_date, task.recurrence]);
+
   // Focus first input on mount
   useEffect(() => { firstInputRef.current?.focus(); }, []);
 

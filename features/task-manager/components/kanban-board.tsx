@@ -50,8 +50,10 @@ let _toastId = 0;
 
 export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment } = useTasks(token, boardId);
-  const [draggingTask, setDraggingTask] = useState<Task | null>(null);
-  const [editingTask, setEditingTask]   = useState<Task | null>(null);
+  const [draggingTask, setDraggingTask]   = useState<Task | null>(null);
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  // Derive live task from tasks array so modal always reflects latest state
+  const editingTask = editingTaskId != null ? (tasks.find(t => t.id === editingTaskId) ?? null) : null;
 
   // Column editor state
   const [editingColumns, setEditingColumns] = useState(false);
@@ -290,7 +292,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             }}
             onStatusChange={moveTask}
             onAddTask={handleAddTask} // Fix K5
-            onEdit={task => { setEditingTask(task); fetchActivity(task.id); fetchSubtasks(task.id); fetchComments(task.id); }}
+            onEdit={task => { setEditingTaskId(task.id); fetchActivity(task.id); fetchSubtasks(task.id); fetchComments(task.id); }}
             selected={selected}
             onToggleSelect={toggleSelect}
             onSelectAll={(ids) => setSelected(prev => new Set([...prev, ...ids]))}
@@ -302,7 +304,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         <TaskEditModal
           task={editingTask}
           onSave={async (id, data) => { await updateTask(id, data); }}
-          onClose={() => setEditingTask(null)}
+          onClose={() => setEditingTaskId(null)}
           labels={labels}
           onAddLabel={(labelId) => addTaskLabel(editingTask.id, labelId)}
           onRemoveLabel={(labelId) => removeTaskLabel(editingTask.id, labelId)}
