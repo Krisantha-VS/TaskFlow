@@ -31,6 +31,7 @@ model Task {
   updatedAt   DateTime  @updatedAt
   board       Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
   labels      Label[]   @relation("TaskLabels")
+  subtasks    Subtask[]
 
   @@index([userId])
   @@index([boardId, status])
@@ -71,4 +72,16 @@ model ActivityLog {
 
   @@index([taskId])
   @@index([boardId, createdAt])
+}
+
+model Subtask {
+  id        Int      @id @default(autoincrement())
+  taskId    Int
+  title     String   @db.VarChar(200)
+  completed Boolean  @default(false)
+  position  Int      @default(0)
+  createdAt DateTime @default(now())
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
 }

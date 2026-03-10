@@ -15,6 +15,15 @@ export interface Board {
   created_at: string;
 }
 
+export interface Subtask {
+  id: number;
+  taskId: number;
+  title: string;
+  completed: boolean;
+  position: number;
+  createdAt: string;
+}
+
 export interface Task {
   id: number;
   board_id: number;
@@ -28,6 +37,7 @@ export interface Task {
   created_at: string;
   updated_at: string;
   labels?: Label[];
+  subtasks?: Subtask[];
 }
 
 export interface ActivityLog {

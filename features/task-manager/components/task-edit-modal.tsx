@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
-import { type Task, type Label, type ActivityLog, PRIORITY_CONFIG } from '../types';
+import { type Task, type Label, type ActivityLog, type Subtask, PRIORITY_CONFIG } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -19,6 +19,39 @@ const COLOR_DOT: Record<string, string> = {
   orange: 'bg-orange-500',
   gray:   'bg-gray-500',
 };
+
+function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
+  const [text, setText] = useState('');
+  const [adding, setAdding] = useState(false);
+
+  const submit = async () => {
+    if (!text.trim()) return;
+    setAdding(true);
+    await onAdd(text.trim());
+    setText('');
+    setAdding(false);
+  };
+
+  return (
+    <div className="flex gap-2 mt-2">
+      <input
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+        placeholder="Add a subtask..."
+        className="flex-1 px-2 py-1 text-xs rounded-md bg-background border border-border outline-none focus:border-primary transition-colors"
+      />
+      <button
+        type="button"
+        disabled={!text.trim() || adding}
+        onClick={submit}
+        className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
+      >
+        Add
+      </button>
+    </div>
+  );
+}
 
 function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: string) => Promise<void> }) {
   const [open, setOpen] = useState(false);
@@ -78,9 +111,13 @@ interface Props {
   onCreateLabel?: (name: string, color: string) => Promise<void>;
   activity?: ActivityLog[];
   activityLoading?: boolean;
+  subtasks?: Subtask[];
+  onCreateSubtask?: (title: string) => Promise<void>;
+  onToggleSubtask?: (id: number, completed: boolean) => Promise<void>;
+  onDeleteSubtask?: (id: number) => Promise<void>;
 }
 
-export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading }: Props) {
+export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask }: Props) {
   const [title, setTitle]       = useState(task.title);
   const [description, setDesc]  = useState(task.description ?? '');
   const [priority, setPriority] = useState(task.priority);
@@ -240,6 +277,62 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               />
             </div>
           </div>
+
+          {/* Subtasks */}
+          {(onCreateSubtask || onToggleSubtask || onDeleteSubtask) && (
+            <div>
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-medium text-muted-foreground">
+                  Checklist
+                  {subtasks.length > 0 && (
+                    <span className="ml-1 text-muted-foreground/60">
+                      ({subtasks.filter(s => s.completed).length}/{subtasks.length})
+                    </span>
+                  )}
+                </label>
+              </div>
+
+              {/* Progress bar */}
+              {subtasks.length > 0 && (
+                <div className="w-full h-1.5 bg-muted rounded-full mb-3 overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{ width: `${Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100)}%` }}
+                  />
+                </div>
+              )}
+
+              {/* Subtask list */}
+              <div className="space-y-1.5">
+                {subtasks.map(s => (
+                  <div key={s.id} className="flex items-center gap-2 group">
+                    <button
+                      type="button"
+                      onClick={() => onToggleSubtask && onToggleSubtask(s.id, !s.completed)}
+                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                        s.completed ? 'bg-primary border-primary' : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      {s.completed && <span className="text-primary-foreground text-[10px] leading-none">✓</span>}
+                    </button>
+                    <span className={`flex-1 text-sm ${s.completed ? 'line-through text-muted-foreground' : ''}`}>
+                      {s.title}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => onDeleteSubtask && onDeleteSubtask(s.id)}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all text-xs"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+
+              {/* Add subtask input */}
+              {onCreateSubtask && <AddSubtaskInput onAdd={onCreateSubtask} />}
+            </div>
+          )}
 
           {/* Labels */}
           {(onAddLabel || onRemoveLabel || onCreateLabel) && (

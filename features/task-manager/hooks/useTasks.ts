@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '../api';
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask } from '../types';
 
 export function useTasks(token: string | null, boardId: number | null) {
   const [tasks, setTasks]               = useState<Task[]>([]);
@@ -154,7 +154,51 @@ export function useTasks(token: string | null, boardId: number | null) {
     finally { setActivityLoading(false); }
   }, [token, boardId]);
 
-  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, reload: load };
+  const [subtasks, setSubtasks] = useState<Record<number, Subtask[]>>({});
+
+  const fetchSubtasks = useCallback(async (taskId: number) => {
+    if (!token) return;
+    try {
+      const data = await taskApi.getSubtasks(token, taskId);
+      setSubtasks(prev => ({ ...prev, [taskId]: data }));
+    } catch { /* non-critical */ }
+  }, [token]);
+
+  const createSubtask = useCallback(async (taskId: number, title: string) => {
+    if (!token) return;
+    try {
+      const subtask = await taskApi.createSubtask(token, taskId, title);
+      setSubtasks(prev => ({ ...prev, [taskId]: [...(prev[taskId] ?? []), subtask] }));
+    } catch { /* ignore */ }
+  }, [token]);
+
+  const toggleSubtask = useCallback(async (taskId: number, subtaskId: number, completed: boolean) => {
+    if (!token) return;
+    // Optimistic update
+    setSubtasks(prev => ({
+      ...prev,
+      [taskId]: (prev[taskId] ?? []).map(s => s.id === subtaskId ? { ...s, completed } : s),
+    }));
+    try {
+      await taskApi.updateSubtask(token, subtaskId, { completed });
+    } catch {
+      // Rollback
+      setSubtasks(prev => ({
+        ...prev,
+        [taskId]: (prev[taskId] ?? []).map(s => s.id === subtaskId ? { ...s, completed: !completed } : s),
+      }));
+    }
+  }, [token]);
+
+  const deleteSubtask = useCallback(async (taskId: number, subtaskId: number) => {
+    if (!token) return;
+    setSubtasks(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(s => s.id !== subtaskId) }));
+    try {
+      await taskApi.deleteSubtask(token, subtaskId);
+    } catch { /* ignore */ }
+  }, [token]);
+
+  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, reload: load };
 }
 
 export function useBoards(token: string | null) {

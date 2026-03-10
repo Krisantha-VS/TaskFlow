@@ -66,6 +66,19 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
         <GripVertical className="w-4 h-4 text-muted-foreground/40 mt-0.5 shrink-0" />
         <div className="flex-1 min-w-0">
           <p className="text-sm font-medium leading-snug break-words">{task.title}</p>
+          {task.subtasks && task.subtasks.length > 0 && (
+            <div className="flex items-center gap-2 mt-1.5">
+              <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
+                <div
+                  className="h-full bg-primary/60 rounded-full transition-all"
+                  style={{ width: `${Math.round((task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[10px] text-muted-foreground shrink-0">
+                {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+              </span>
+            </div>
+          )}
         </div>
         {/* Fix AC1: aria-label on edit button */}
         <button

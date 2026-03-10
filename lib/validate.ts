@@ -37,3 +37,13 @@ export const LabelCreateSchema = z.object({
 export const TaskLabelSchema = z.object({
   labelId: z.number().int().positive(),
 });
+
+export const SubtaskCreateSchema = z.object({
+  title: z.string().min(1).max(200).trim(),
+});
+
+export const SubtaskUpdateSchema = z.object({
+  title:     z.string().min(1).max(200).trim().optional(),
+  completed: z.boolean().optional(),
+  position:  z.number().int().min(0).optional(),
+});

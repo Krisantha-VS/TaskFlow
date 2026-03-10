@@ -1,4 +1,4 @@
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask } from '../types';
 import { authFetch } from '../lib/auth-fetch';
 
 const BASE = '/api';
@@ -51,4 +51,13 @@ export const taskApi = {
 
   getActivity: (token: string, boardId: number) =>
     req<ActivityLog[]>(`activity?board_id=${boardId}`, 'GET', undefined, token),
+
+  getSubtasks:   (token: string, taskId: number) =>
+    req<Subtask[]>(`tasks/${taskId}/subtasks`, 'GET', undefined, token),
+  createSubtask: (token: string, taskId: number, title: string) =>
+    req<Subtask>(`tasks/${taskId}/subtasks`, 'POST', { title }, token),
+  updateSubtask: (token: string, id: number, data: Partial<Pick<Subtask, 'title' | 'completed' | 'position'>>) =>
+    req<Subtask>(`subtasks/${id}`, 'PATCH', data, token),
+  deleteSubtask: (token: string, id: number) =>
+    req<null>(`subtasks/${id}`, 'DELETE', undefined, token),
 };
