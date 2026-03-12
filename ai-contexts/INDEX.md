@@ -33,6 +33,7 @@
 | `project.md` | Stack, env vars, deploy URLs, DB, auth | Starting any work |
 | `architecture.md` | File map, API routes, data flow | Adding routes or refactoring |
 | `plan.md` | Detailed spec for each pending feature | Planning next feature |
+| `changelog.md` | Per-session log of what changed and why | Debugging or catching up |
 | `schema.md` | Prisma schema + migration notes | DB / schema changes |
 
 ---
