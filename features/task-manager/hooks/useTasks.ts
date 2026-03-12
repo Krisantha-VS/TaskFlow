@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { taskApi } from '../api';
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn, Sprint } from '../types';
 
 export function useTasks(token: string | null, boardId: number | null) {
   const [tasks, setTasks]               = useState<Task[]>([]);
@@ -11,6 +11,7 @@ export function useTasks(token: string | null, boardId: number | null) {
   const [error, setError]               = useState<string | null>(null);
   // Fix A6: mutation-level error state
   const [mutationError, setMutationError] = useState<string | null>(null);
+  const [sprints, setSprints]           = useState<Sprint[]>([]);
 
   const load = useCallback(async () => {
     if (!token || !boardId) return;
@@ -31,6 +32,46 @@ export function useTasks(token: string | null, boardId: number | null) {
   }, [token, boardId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // SSE: subscribe to board stream for real-time updates
+  useEffect(() => {
+    if (!token || !boardId) return;
+
+    const controller = new AbortController();
+
+    (async () => {
+      try {
+        const res = await fetch(`/api/boards/${boardId}/stream`, {
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal,
+        });
+        if (!res.ok || !res.body) return;
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buf = '';
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          buf += decoder.decode(value, { stream: true });
+          const lines = buf.split('\n\n');
+          buf = lines.pop() ?? '';
+          for (const chunk of lines) {
+            const dataLine = chunk.split('\n').find(l => l.startsWith('data: '));
+            if (!dataLine) continue;
+            try {
+              const event = JSON.parse(dataLine.slice(6));
+              if (event.type === 'activity') {
+                // Re-fetch tasks to reflect the change
+                load();
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      } catch { /* connection closed or aborted */ }
+    })();
+
+    return () => controller.abort();
+  }, [token, boardId, load]);
 
   // Fix A6: createTask — wrapped in try/catch, returns { error }
   const createTask = async (
@@ -135,6 +176,29 @@ export function useTasks(token: string | null, boardId: number | null) {
     }));
   };
 
+  const addDependency = useCallback(async (taskId: number, blockerId: number) => {
+    if (!token) return;
+    try {
+      await taskApi.addDependency(token, taskId, blockerId);
+      // Reload to get fresh blockedBy array
+      await load();
+    } catch { /* ignore */ }
+  }, [token, load]);
+
+  const removeDependency = useCallback(async (taskId: number, blockerId: number) => {
+    if (!token) return;
+    // Optimistic
+    setTasks(prev => prev.map(t => t.id === taskId
+      ? { ...t, blockedBy: (t.blockedBy ?? []).filter(d => d.blockerId !== blockerId) }
+      : t
+    ));
+    try {
+      await taskApi.removeDependency(token, taskId, blockerId);
+    } catch {
+      await load();
+    }
+  }, [token, load]);
+
   const createLabel = async (name: string, color: string): Promise<void> => {
     if (!token || !boardId) return;
     const label = await taskApi.createLabel(token, boardId, name, color);
@@ -224,7 +288,40 @@ export function useTasks(token: string | null, boardId: number | null) {
     } catch { /* ignore */ }
   }, [token]);
 
-  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, reload: load };
+  const fetchSprints = useCallback(async () => {
+    if (!token || !boardId) return;
+    try {
+      const data = await taskApi.getSprints(token, boardId);
+      setSprints(data);
+    } catch { /* ignore */ }
+  }, [token, boardId]);
+
+  useEffect(() => { fetchSprints(); }, [fetchSprints]);
+
+  const createSprint = useCallback(async (name: string, startDate?: string, endDate?: string) => {
+    if (!token || !boardId) return;
+    try {
+      const sprint = await taskApi.createSprint(token, { board_id: boardId, name, start_date: startDate, end_date: endDate });
+      setSprints(prev => [...prev, sprint]);
+      return sprint;
+    } catch { /* ignore */ }
+  }, [token, boardId]);
+
+  const deleteSprint = useCallback(async (id: number) => {
+    if (!token) return;
+    setSprints(prev => prev.filter(s => s.id !== id));
+    // Tasks with this sprint become backlog automatically (SetNull)
+    setTasks(prev => prev.map(t => t.sprintId === id ? { ...t, sprintId: null } : t));
+    try { await taskApi.deleteSprint(token, id); } catch { await load(); }
+  }, [token, load]);
+
+  const setTaskSprint = useCallback(async (taskId: number, sprintId: number | null) => {
+    if (!token) return;
+    setTasks(prev => prev.map(t => t.id === taskId ? { ...t, sprintId } : t));
+    try { await taskApi.updateTask(token, taskId, { sprintId } as never); } catch { await load(); }
+  }, [token, load]);
+
+  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, fetchSprints, createSprint, deleteSprint, setTaskSprint, reload: load };
 }
 
 export function useBoards(token: string | null) {
