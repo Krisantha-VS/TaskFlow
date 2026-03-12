@@ -104,7 +104,39 @@ function useInlineAuth() {
     setRegistrationSuccess(false);
   }, []);
 
-  return { token, loading, error, registrationSuccess, login, register, logout };
+  const loginDemo = async () => {
+    const DEMO_EMAIL    = 'demo@taskflow.app';
+    const DEMO_PASSWORD = 'Demo@TaskFlow1';
+    const DEMO_NAME     = 'Demo User';
+    setLoading(true); setError(''); setRegistrationSuccess(false);
+    try {
+      // Try login first; if account doesn't exist yet, register then login
+      let res = await fetch(`${AUTH_BASE}/auth/login`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ clientId: AUTH_CLIENT_ID, email: DEMO_EMAIL, password: DEMO_PASSWORD }),
+      });
+      let json = await res.json();
+      if (!json.success && json.code === 'INVALID_CREDENTIALS') {
+        // Demo account not yet created — register it
+        const regRes = await fetch(`${AUTH_BASE}/auth/register`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ clientId: AUTH_CLIENT_ID, email: DEMO_EMAIL, password: DEMO_PASSWORD, name: DEMO_NAME }),
+        });
+        const regJson = await regRes.json();
+        if (!regJson.success) throw new Error(regJson.error);
+        storeTokens(regJson.data.tokens.accessToken, regJson.data.tokens.refreshToken);
+        setToken(regJson.data.tokens.accessToken);
+        return;
+      }
+      if (!json.success) throw new Error(json.error);
+      storeTokens(json.data.accessToken, json.data.refreshToken);
+      setToken(json.data.accessToken);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Demo login failed');
+    } finally { setLoading(false); }
+  };
+
+  return { token, loading, error, registrationSuccess, login, register, logout, loginDemo };
 }
 
 // ─── Auth Gate ────────────────────────────────────────────
@@ -113,12 +145,13 @@ function useInlineAuth() {
 interface AuthGateProps {
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string, name: string) => Promise<void>;
+  loginDemo: () => Promise<void>;
   loading: boolean;
   error: string;
   registrationSuccess: boolean;
 }
 
-function AuthGate({ login, register, loading, error, registrationSuccess }: AuthGateProps) {
+function AuthGate({ login, register, loginDemo, loading, error, registrationSuccess }: AuthGateProps) {
   // Fix M5: extend mode to include 'forgot'
   const [mode, setMode]           = useState<'login' | 'register' | 'forgot'>('login');
   const [email, setEmail]         = useState('');
@@ -255,6 +288,27 @@ function AuthGate({ login, register, loading, error, registrationSuccess }: Auth
           </p>
         )}
 
+        {mode === 'login' && (
+          <>
+            <div className="relative my-1">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-border" />
+              </div>
+              <div className="relative flex justify-center">
+                <span className="px-2 bg-background text-xs text-muted-foreground/50">or</span>
+              </div>
+            </div>
+            <button
+              type="button"
+              disabled={loading}
+              onClick={loginDemo}
+              className="w-full py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
+            >
+              Try demo account
+            </button>
+          </>
+        )}
+
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
           Secured by{' '}
           <a href="/explore" className="hover:text-muted-foreground transition-colors">
@@ -270,7 +324,7 @@ function AuthGate({ login, register, loading, error, registrationSuccess }: Auth
 
 export function TaskManagerApp() {
   // Fix A1/A2: single useInlineAuth instance at the top level
-  const { token, loading: authLoading, error: authError, registrationSuccess, login, register, logout } = useInlineAuth();
+  const { token, loading: authLoading, error: authError, registrationSuccess, login, register, logout, loginDemo } = useInlineAuth();
   const { boards, loading: boardsLoading, error: boardsError, createBoard, deleteBoard, updateBoardColumns } = useBoards(token);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
   const [newBoardName, setNewBoardName]   = useState('');
@@ -300,6 +354,7 @@ export function TaskManagerApp() {
       <AuthGate
         login={login}
         register={register}
+        loginDemo={loginDemo}
         loading={authLoading}
         error={authError}
         registrationSuccess={registrationSuccess}
