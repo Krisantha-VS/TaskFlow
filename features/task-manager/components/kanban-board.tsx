@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
-import { Search, Columns } from 'lucide-react';
+import { useState, useRef, useEffect } from 'react';
+import { Search, Columns, Download, BarChart2, Users } from 'lucide-react';
 import { DEFAULT_COLUMNS, type Board, type BoardColumn, type Task, type TaskStatus, type TaskPriority } from '../types';
 import { KanbanColumn } from './kanban-column';
 import { TaskEditModal } from './task-edit-modal';
 import { useTasks } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ColumnEditor } from '@/components/column-editor';
+import { AnalyticsPanel } from './analytics-panel';
+import { SprintSelector } from './sprint-selector';
+import { MembersPanel } from './members-panel';
 
 type SortKey = 'default' | 'priority' | 'due_date' | 'created';
 
@@ -49,7 +52,7 @@ interface Toast {
 let _toastId = 0;
 
 export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
-  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment } = useTasks(token, boardId);
+  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, createSprint, deleteSprint } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask]   = useState<Task | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   // Derive live task from tasks array so modal always reflects latest state
@@ -57,6 +60,15 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
 
   // Column editor state
   const [editingColumns, setEditingColumns] = useState(false);
+
+  // Analytics panel state
+  const [showAnalytics, setShowAnalytics] = useState(false);
+
+  // Members panel state
+  const [showMembers, setShowMembers] = useState(false);
+
+  // Sprint filter state
+  const [activeSprint, setActiveSprint] = useState<number | 'backlog' | null>(null);
 
   // Derive active columns from board prop, falling back to defaults
   const columns: BoardColumn[] = (board?.columns as BoardColumn[] | null) ?? DEFAULT_COLUMNS;
@@ -78,6 +90,39 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
 
   // Sort state
   const [sortKey, setSortKey] = useState<SortKey>('default');
+
+  // Export dropdown state
+  const [exportOpen, setExportOpen] = useState(false);
+  const exportRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!exportOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (exportRef.current && !exportRef.current.contains(e.target as Node)) {
+        setExportOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
+
+  const handleExport = async (format: 'csv' | 'ics') => {
+    try {
+      const res = await fetch(`/api/boards/${boardId}/export?format=${format}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (!res.ok) { addToast('Export failed', 'error'); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = format === 'csv' ? 'tasks.csv' : 'tasks.ics';
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch {
+      addToast('Export failed', 'error');
+    }
+  };
 
   // Task delete confirmation state
   const [confirmTask, setConfirmTask] = useState<{ id: number; title: string } | null>(null);
@@ -157,6 +202,13 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
       )
     : tasks;
 
+  // Filter tasks by sprint
+  const sprintFiltered = activeSprint === null
+    ? filtered
+    : activeSprint === 'backlog'
+      ? filtered.filter(t => !t.sprintId)
+      : filtered.filter(t => t.sprintId === activeSprint);
+
   if (loading) return (
     <div className="flex items-center justify-center py-24 text-muted-foreground">
       <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3" />
@@ -203,6 +255,39 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             <Columns className="w-3.5 h-3.5" />
             Columns
           </button>
+
+          <button
+            onClick={() => setShowAnalytics(true)}
+            title="View analytics"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <BarChart2 className="w-3.5 h-3.5" />
+            Analytics
+          </button>
+
+          <button
+            onClick={() => setShowMembers(true)}
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Users className="w-3.5 h-3.5" />
+            Members
+          </button>
+
+          <div className="relative" ref={exportRef}>
+            <button
+              onClick={() => setExportOpen(v => !v)}
+              className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+            >
+              <Download className="w-3.5 h-3.5" />
+              Export
+            </button>
+            {exportOpen && (
+              <div className="absolute right-0 top-full mt-1 z-20 glass border border-border rounded-xl shadow-xl py-1 w-36">
+                <button onClick={() => { handleExport('csv'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">CSV Spreadsheet</button>
+                <button onClick={() => { handleExport('ics'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">Calendar (.ics)</button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -213,6 +298,14 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           onCancel={() => setEditingColumns(false)}
         />
       )}
+
+      <SprintSelector
+        sprints={sprints}
+        activeSprint={activeSprint}
+        onSelect={setActiveSprint}
+        onCreateSprint={async (name, start, end) => createSprint(name, start, end)}
+        onDeleteSprint={async (id) => deleteSprint(id)}
+      />
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
@@ -281,7 +374,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             status={col.key as TaskStatus}
             label={col.label}
             colorClass={col.color ?? ''}
-            tasks={sortTasks(filtered.filter(t => t.status === col.key), sortKey)}
+            tasks={sortTasks(sprintFiltered.filter(t => t.status === col.key), sortKey)}
             onDrop={handleDrop}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd} // Fix K1
@@ -318,7 +411,18 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           comments={comments[editingTask.id] ?? []}
           onAddComment={(text) => addComment(editingTask.id, text)}
           onDeleteComment={(id) => deleteComment(editingTask.id, id)}
+          allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+          onAddDependency={(blockerId) => addDependency(editingTask.id, blockerId)}
+          onRemoveDependency={(blockerId) => removeDependency(editingTask.id, blockerId)}
         />
+      )}
+
+      {showAnalytics && (
+        <AnalyticsPanel token={token} boardId={boardId} onClose={() => setShowAnalytics(false)} />
+      )}
+
+      {showMembers && (
+        <MembersPanel token={token} boardId={boardId} onClose={() => setShowMembers(false)} />
       )}
 
       {/* Task delete confirmation dialog */}
