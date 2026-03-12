@@ -71,9 +71,9 @@ function useInlineAuth() {
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error);
-      storeTokens(json.data.accessToken, json.data.refreshToken);
+      storeTokens(json.data.tokens.accessToken, json.data.tokens.refreshToken);
       // Fix A1/A2: setToken here is reactive — no sessionStorage read needed
-      setToken(json.data.accessToken);
+      setToken(json.data.tokens.accessToken);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Login failed');
     } finally { setLoading(false); }
@@ -129,8 +129,8 @@ function useInlineAuth() {
         return;
       }
       if (!json.success) throw new Error(json.error);
-      storeTokens(json.data.accessToken, json.data.refreshToken);
-      setToken(json.data.accessToken);
+      storeTokens(json.data.tokens.accessToken, json.data.tokens.refreshToken);
+      setToken(json.data.tokens.accessToken);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Demo login failed');
     } finally { setLoading(false); }
