@@ -7,38 +7,45 @@ datasource db {
 }
 
 model Board {
-  id        Int      @id @default(autoincrement())
+  id        Int           @id @default(autoincrement())
   userId    String
-  name      String   @db.VarChar(100)
-  createdAt DateTime @default(now())
+  name      String        @db.VarChar(100)
+  createdAt DateTime      @default(now())
   columns   Json?
   tasks     Task[]
   labels    Label[]
+  sprints   Sprint[]
+  members   BoardMember[]
 
   @@index([userId])
 }
 
 model Task {
-  id          Int       @id @default(autoincrement())
-  boardId     Int
-  userId      String
-  title       String    @db.VarChar(200)
-  description String?   @db.Text
-  status      Status    @default(todo)
-  priority    Priority  @default(medium)
-  position    Int       @default(0)
-  dueDate     DateTime?
-  recurrence  String?   @db.VarChar(20)
+  id             Int                @id @default(autoincrement())
+  boardId        Int
+  userId         String
+  sprintId       Int?
+  title          String             @db.VarChar(200)
+  description    String?            @db.Text
+  status         Status             @default(todo)
+  priority       Priority           @default(medium)
+  position       Int                @default(0)
+  dueDate        DateTime?
+  recurrence     String?            @db.VarChar(20)
   nextOccurrence DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  board       Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
-  labels      Label[]   @relation("TaskLabels")
-  subtasks    Subtask[]
-  comments    Comment[]
+  createdAt      DateTime           @default(now())
+  updatedAt      DateTime           @updatedAt
+  board          Board              @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  sprint         Sprint?            @relation(fields: [sprintId], references: [id], onDelete: SetNull)
+  labels         Label[]            @relation("TaskLabels")
+  subtasks       Subtask[]
+  comments       Comment[]
+  blockedBy      TaskDependency[]   @relation("BlockedTask")
+  blocking       TaskDependency[]   @relation("BlockerTask")
 
   @@index([userId])
   @@index([boardId, status])
+  @@index([sprintId])
 }
 
 model Label {
@@ -100,4 +107,44 @@ model Comment {
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
 
   @@index([taskId, createdAt])
+}
+
+model TaskDependency {
+  id        Int      @id @default(autoincrement())
+  blockerId Int
+  blockedId Int
+  blocker   Task     @relation("BlockerTask", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked   Task     @relation("BlockedTask", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockedId])
+}
+
+model Sprint {
+  id        Int       @id @default(autoincrement())
+  boardId   Int
+  name      String    @db.VarChar(100)
+  startDate DateTime?
+  endDate   DateTime?
+  createdAt DateTime  @default(now())
+  board     Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([boardId])
+}
+
+model BoardMember {
+  id           Int       @id @default(autoincrement())
+  boardId      Int
+  userId       String?
+  role         String    @db.VarChar(20) @default("viewer")
+  inviteEmail  String    @db.VarChar(200)
+  inviteToken  String    @unique @db.VarChar(100)
+  acceptedAt   DateTime?
+  createdAt    DateTime  @default(now())
+  board        Board     @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  @@unique([boardId, inviteEmail])
+  @@index([boardId])
+  @@index([inviteToken])
 }

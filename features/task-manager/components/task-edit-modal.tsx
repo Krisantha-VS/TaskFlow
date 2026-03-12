@@ -152,9 +152,12 @@ interface Props {
   comments?: Comment[];
   onAddComment?: (text: string) => Promise<void>;
   onDeleteComment?: (id: number) => Promise<void>;
+  allTasks?: { id: number; title: string }[];
+  onAddDependency?: (blockerId: number) => Promise<void>;
+  onRemoveDependency?: (blockerId: number) => Promise<void>;
 }
 
-export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask, comments = [], onAddComment, onDeleteComment }: Props) {
+export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask, comments = [], onAddComment, onDeleteComment, allTasks, onAddDependency, onRemoveDependency }: Props) {
   const [title, setTitle]             = useState(task.title);
   const [description, setDesc]        = useState(task.description ?? '');
   const [priority, setPriority]       = useState(task.priority);
@@ -425,6 +428,40 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               </div>
               {/* Create new label inline */}
               {onCreateLabel && <NewLabelForm onCreateLabel={onCreateLabel} />}
+            </div>
+          )}
+
+          {/* Dependencies */}
+          {(onAddDependency || onRemoveDependency) && (
+            <div>
+              <label className="text-xs font-medium text-muted-foreground block mb-2">Blocked by</label>
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {(task.blockedBy ?? []).map(dep => (
+                  <span key={dep.id} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400">
+                    🔒 {dep.blocker.title}
+                    {onRemoveDependency && (
+                      <button type="button" onClick={() => onRemoveDependency(dep.blockerId)} className="hover:text-red-300 ml-0.5">×</button>
+                    )}
+                  </span>
+                ))}
+              </div>
+              {onAddDependency && (allTasks ?? []).filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id)).length > 0 && (
+                <select
+                  defaultValue=""
+                  onChange={async e => {
+                    if (!e.target.value) return;
+                    await onAddDependency(parseInt(e.target.value));
+                    e.target.value = '';
+                  }}
+                  className="w-full px-3 py-2 rounded-lg bg-background border border-border text-xs outline-none focus:border-primary transition-colors"
+                >
+                  <option value="">+ Add blocker…</option>
+                  {(allTasks ?? [])
+                    .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
+                    .map(t => <option key={t.id} value={t.id}>{t.title}</option>)
+                  }
+                </select>
+              )}
             </div>
           )}
         </div>

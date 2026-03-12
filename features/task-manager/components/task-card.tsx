@@ -138,6 +138,15 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
         </div>
       )}
 
+      {/* Blocked badge */}
+      {task.blockedBy && task.blockedBy.length > 0 && (
+        <div className="mt-1.5 ml-6">
+          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 font-medium">
+            🔒 Blocked
+          </span>
+        </div>
+      )}
+
       {/* Footer */}
       <div className="flex items-center justify-between mt-3 ml-6">
         <div className="flex items-center gap-1.5">

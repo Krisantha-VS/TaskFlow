@@ -22,7 +22,7 @@ export async function GET(req: NextRequest) {
     if (!board) return fail('Board not found', 404);
     const tasks = await db.task.findMany({
       where: { boardId },
-      include: { labels: true, subtasks: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] } },
+      include: { labels: true, subtasks: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }, blockedBy: { include: { blocker: { select: { id: true, title: true } } } } },
       orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
     });
     return ok(tasks);
