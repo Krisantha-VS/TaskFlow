@@ -1,4 +1,4 @@
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn, BoardAnalytics, TaskDependency, Sprint, BoardMember } from '../types';
 import { authFetch } from '../lib/auth-fetch';
 
 const BASE = '/api';
@@ -54,6 +54,9 @@ export const taskApi = {
   getActivity: (token: string, boardId: number) =>
     req<ActivityLog[]>(`activity?board_id=${boardId}`, 'GET', undefined, token),
 
+  getAnalytics: (token: string, boardId: number) =>
+    req<BoardAnalytics>(`boards/${boardId}/analytics`, 'GET', undefined, token),
+
   getSubtasks:   (token: string, taskId: number) =>
     req<Subtask[]>(`tasks/${taskId}/subtasks`, 'GET', undefined, token),
   createSubtask: (token: string, taskId: number, title: string) =>
@@ -71,4 +74,25 @@ export const taskApi = {
     req<Comment>(`comments/${id}`, 'PATCH', { text }, token),
   deleteComment: (token: string, id: number) =>
     req<null>(`comments/${id}`, 'DELETE', undefined, token),
+
+  addDependency: (token: string, taskId: number, blockerId: number) =>
+    req<TaskDependency>(`tasks/${taskId}/dependencies`, 'POST', { blocker_id: blockerId }, token),
+  removeDependency: (token: string, taskId: number, blockerId: number) =>
+    req<null>(`tasks/${taskId}/dependencies`, 'DELETE', { blocker_id: blockerId }, token),
+
+  getSprints: (token: string, boardId: number) =>
+    req<Sprint[]>(`sprints?board_id=${boardId}`, 'GET', undefined, token),
+  createSprint: (token: string, data: { board_id: number; name: string; start_date?: string; end_date?: string }) =>
+    req<Sprint>('sprints', 'POST', data, token),
+  updateSprint: (token: string, id: number, data: Partial<Pick<Sprint, 'name' | 'startDate' | 'endDate'>>) =>
+    req<Sprint>(`sprints/${id}`, 'PATCH', data, token),
+  deleteSprint: (token: string, id: number) =>
+    req<null>(`sprints/${id}`, 'DELETE', undefined, token),
+
+  getBoardMembers: (token: string, boardId: number) =>
+    req<BoardMember[]>(`boards/${boardId}/members`, 'GET', undefined, token),
+  inviteMember: (token: string, boardId: number, email: string, role: string) =>
+    req<BoardMember & { inviteUrl?: string }>(`boards/${boardId}/members`, 'POST', { email, role }, token),
+  removeMember: (token: string, boardId: number, email: string) =>
+    req<null>(`boards/${boardId}/members`, 'DELETE', { email }, token),
 };

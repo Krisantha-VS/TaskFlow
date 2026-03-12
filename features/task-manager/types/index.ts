@@ -53,6 +53,36 @@ export interface Task {
   updated_at: string;
   labels?: Label[];
   subtasks?: Subtask[];
+  blockedBy?: TaskDependency[];
+  sprintId?: number | null;
+}
+
+export interface Sprint {
+  id: number;
+  boardId: number;
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+  createdAt: string;
+}
+
+export interface BoardMember {
+  id: number;
+  boardId: number;
+  userId: string | null;
+  role: string;
+  inviteEmail: string;
+  inviteToken: string;
+  inviteUrl?: string;
+  acceptedAt: string | null;
+  createdAt: string;
+}
+
+export interface TaskDependency {
+  id: number;
+  blockerId: number;
+  blockedId: number;
+  blocker: { id: number; title: string };
 }
 
 export interface ActivityLog {
@@ -72,6 +102,15 @@ export interface Comment {
   text: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface BoardAnalytics {
+  byStatus: Record<string, number>;
+  byPriority: Record<string, number>;
+  dailyCompletions: { date: string; count: number }[];
+  dailyCreated: { date: string; count: number }[];
+  avgCompletionDays: number | null;
+  total: number;
 }
 
 export const COLUMNS: { key: TaskStatus; label: string; color: string }[] = [
