@@ -49,7 +49,7 @@ function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<void> })
         onChange={e => setText(e.target.value)}
         onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
         placeholder="Add a subtask..."
-        className="flex-1 px-2 py-1 text-xs rounded-md bg-muted/30 border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+        className="flex-1 px-2 py-1 text-xs rounded-md bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
       />
       <button
         type="button"
@@ -82,7 +82,7 @@ function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: 
         value={name}
         onChange={e => setName(e.target.value)}
         placeholder="Label name"
-        className="flex-1 min-w-0 px-2 py-1 text-xs rounded-md bg-muted/30 border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+        className="flex-1 min-w-0 px-2 py-1 text-xs rounded-md bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
       />
       <div className="flex gap-1">
         {COLORS.map(c => (
@@ -132,7 +132,7 @@ function CommentInput({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
         onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
         placeholder="Write a comment… (Enter to send)"
         rows={2}
-        className="flex-1 px-3 py-2 text-xs rounded-lg bg-muted/30 border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors resize-none"
+        className="flex-1 px-3 py-2 text-xs rounded-lg bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors resize-none"
       />
       <button
         type="button"
@@ -304,7 +304,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               // Fix K3: guard Enter key with saving state
               onKeyDown={e => { if (e.key === 'Enter' && !saving) handleSave(); }}
               placeholder="Task title"
-              className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors placeholder:text-muted-foreground/50"
+              className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors placeholder:text-muted-foreground/50"
             />
           </div>
 
@@ -317,7 +317,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               onChange={e => setDesc(e.target.value)}
               placeholder="Add a description…"
               rows={4}
-              className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors placeholder:text-muted-foreground/50 resize-none"
+              className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors placeholder:text-muted-foreground/50 resize-none"
             />
           </div>
 
@@ -329,7 +329,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 id="task-priority-field"
                 value={priority}
                 onChange={e => setPriority(e.target.value as Task['priority'])}
-                className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
               >
                 {Object.entries(PRIORITY_CONFIG).map(([k, v]) => (
                   <option key={k} value={k}>{v.label}</option>
@@ -344,7 +344,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 type="date"
                 value={dueDate}
                 onChange={e => setDueDate(e.target.value)}
-                className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
               />
               {dueDate && new Date(dueDate) < new Date(new Date().toDateString()) && (
                 <p className="text-[10px] text-red-400 font-medium">Past due</p>
@@ -359,7 +359,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               id="task-repeat-field"
               value={recurrence ?? ''}
               onChange={e => setRecurrence((e.target.value || null) as 'daily' | 'weekly' | 'monthly' | null)}
-              className="w-full bg-muted/30 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+              className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
             >
               <option value="">Never</option>
               <option value="daily">Daily</option>
@@ -481,7 +481,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                     await onAddDependency(parseInt(e.target.value));
                     e.target.value = '';
                   }}
-                  className="w-full px-3 py-2 rounded-lg bg-muted/30 border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                  className="w-full px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
                 >
                   <option value="">+ Add blocker…</option>
                   {(allTasks ?? [])
