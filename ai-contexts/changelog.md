@@ -4,6 +4,24 @@
 
 ---
 
+## 2026-03-27 (Session 3)
+
+**Commits:** `bb5a84d` (ORG-001 audit) · `af9d3a0` (ORG-002 UI/UX) — NOT pushed to remote
+
+### Done
+- **ORG-001 full audit** — 20+ code quality, security, and performance fixes across 14 files
+- **ORG-002 Tier 1** — 7 WCAG 2.1 AA violations resolved (Escape key, focus return, contrast, aria-labels, export keyboard nav)
+- **ORG-002 Tier 2** — Framer Motion AnimatePresence for task cards; label filter chips; aria-live region
+
+### Key files changed
+`confirm-dialog.tsx`, `label-pill.tsx`, `kanban-board.tsx`, `kanban-column.tsx`, `task-card.tsx`, `task-edit-modal.tsx`, `sprint-selector.tsx`, `members-panel.tsx`, `analytics-panel.tsx`, `app/api/invites/[token]/route.ts`, `app/api/boards/[id]/analytics/route.ts`, `app/api/boards/[id]/stream/route.ts`, `features/task-manager/hooks/useTasks.ts`, `lib/db.ts`, `lib/rate-limit.ts`, `lib/email.ts`, `lib/activity.ts`, `prisma/schema.prisma`
+
+### Notes
+- Push pending — run `vercel --prod` after `git push`
+- Tier 3 remaining: task expand/collapse animation, drag easing, mobile toolbar, sprint badge on card
+
+---
+
 ## 2026-03-12 (Session 2)
 
 **Commits:** `6821646` ← `6a1567f` ← `b5ca7ea` ← `ce70a03`

@@ -22,7 +22,7 @@
 | F5 | Real-time sync (SSE / WebSocket) | ✅ done |
 | F6 | Board sharing (invite by email, roles) | ✅ done |
 
-**Progress: 14 / 14 features — 100% ✅** | Last deployed: 2026-03-12
+**Progress: 14 / 14 features — 100% ✅** | Last audit: 2026-03-27 (ORG-001 + ORG-002 improvements committed, not pushed)
 
 ---
 
@@ -61,6 +61,36 @@
 **Schema changes (db push applied):** TaskDependency, Sprint, BoardMember models added. Task.sprintId added.
 
 **Note:** F6 board sharing requires `RESEND_API_KEY` env var for email. Without it, invite link is shown in UI (copy-to-clipboard). Add to Vercel env when ready.
+
+---
+
+## Session 2026-03-27 — ORG-001 Audit + ORG-002 UI/UX Improvements
+
+**Commits:** `bb5a84d` (ORG-001 audit fixes) · `af9d3a0` (ORG-002 Tier 1 + Tier 2) — NOT pushed
+
+### ORG-001 Batch (bb5a84d) — Code quality, security, performance
+- Auth bypass fix in invites route; rate limit on labels/comments routes
+- Recurrence spawn in `db.$transaction()`; immutable date construction
+- Analytics: `$queryRaw` GROUP BY DATE (replaced O(30×tasks) JS loops)
+- SSE: granular typed events (task_created/updated/deleted/moved) + 60s idle timeout
+- SSE client: local state mutations instead of full `load()` refetch
+- `Promise.allSettled` in all bulk ops; `ConfirmDialog` replaces native `confirm()`
+- `React.memo` on KanbanColumn + TaskCard; `useMemo` for getDueDateStyle
+- DB connection pool + rate-limit eviction; Prisma indexes on TaskDependency + ActivityLog
+- UX: search clear button, empty board/column states, sprint inline delete confirm, analytics error retry
+
+### ORG-002 Tier 1 (af9d3a0) — WCAG 2.1 AA
+- `confirm-dialog.tsx`: Escape key closes; `role=dialog` + `aria-labelledby`
+- `label-pill.tsx`: `aria-label` on remove button
+- `kanban-column.tsx`: placeholder contrast fixed; Select all `focus:opacity-100`
+- `kanban-board.tsx`: focus returns to trigger on modal close; `aria-label` on sort + bulk selects; export dropdown `aria-expanded` + `role=menu` + Escape key
+
+### ORG-002 Tier 2 (af9d3a0) — Visual & UX
+- `kanban-column.tsx`: AnimatePresence + motion.div for task enter/exit + empty state fade
+- `kanban-board.tsx`: label filter chips (toggle, clear all); `aria-live="polite"` region
+
+**Next:** Push to production (`vercel --prod` from `E:\GITPRJ\taskflow\` if auto-deploy doesn't trigger)
+**Remaining:** Tier 3 (task expand animation, drag easing, mobile toolbar, sprint badge on card)
 
 ---
 
