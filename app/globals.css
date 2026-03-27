@@ -1,35 +1,57 @@
 @import "tailwindcss";
 
 :root {
-  --background: hsl(0 0% 100%);
-  --foreground: hsl(222.2 84% 4.9%);
-  --primary: hsl(262.1 83.3% 57.8%);
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(210 40% 96.1%);
-  --secondary-foreground: hsl(222.2 47.4% 11.2%);
-  --muted: hsl(210 40% 96.1%);
-  --muted-foreground: hsl(215.4 16.3% 46.9%);
-  --accent: hsl(210 40% 96.1%);
-  --destructive: hsl(0 84.2% 60.2%);
-  --border: hsl(214.3 31.8% 91.4%);
-  --input: hsl(214.3 31.8% 91.4%);
-  --ring: hsl(262.1 83.3% 57.8%);
+  --background: hsl(250 30% 99%);
+  --foreground: hsl(250 25% 10%);
+  --primary: hsl(262 83% 57%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(258 30% 92%);
+  --secondary-foreground: hsl(258 30% 20%);
+  --muted: hsl(240 10% 90%);
+  --muted-foreground: hsl(240 8% 46%);
+  --accent: hsl(258 60% 95%);
+  --accent-foreground: hsl(258 60% 30%);
+  --destructive: hsl(0 84% 60%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(250 20% 88%);
+  --input: hsl(250 25% 97%);
+  --ring: hsl(262 83% 57%);
+
+  --success: hsl(142 72% 40%);
+  --success-muted: hsl(142 60% 94%);
+  --warning: hsl(38 90% 48%);
+  --warning-muted: hsl(38 90% 94%);
+  --info: hsl(210 85% 55%);
+  --info-muted: hsl(210 85% 94%);
+  --overdue: hsl(0 80% 58%);
+  --overdue-muted: hsl(0 80% 95%);
 }
 
 .dark {
-  --background: hsl(222.2 84% 4.9%);
-  --foreground: hsl(210 40% 98%);
-  --primary: hsl(263.4 70% 50.4%);
-  --primary-foreground: hsl(210 40% 98%);
-  --secondary: hsl(217.2 32.6% 17.5%);
-  --secondary-foreground: hsl(210 40% 98%);
-  --muted: hsl(217.2 32.6% 17.5%);
-  --muted-foreground: hsl(215 20.2% 65.1%);
-  --accent: hsl(217.2 32.6% 17.5%);
-  --destructive: hsl(0 62.8% 30.6%);
-  --border: hsl(217.2 32.6% 17.5%);
-  --input: hsl(217.2 32.6% 17.5%);
-  --ring: hsl(263.4 70% 50.4%);
+  --background: hsl(250 25% 7%);
+  --foreground: hsl(250 15% 95%);
+  --primary: hsl(262 83% 67%);
+  --primary-foreground: hsl(0 0% 100%);
+  --secondary: hsl(258 22% 16%);
+  --secondary-foreground: hsl(258 15% 85%);
+  --muted: hsl(245 15% 20%);
+  --muted-foreground: hsl(245 12% 58%);
+  --accent: hsl(258 28% 24%);
+  --accent-foreground: hsl(258 70% 82%);
+  --destructive: hsl(0 62% 50%);
+  --destructive-foreground: hsl(0 0% 100%);
+  --border: hsl(250 20% 22%);
+  --input: hsl(250 22% 13%);
+  --ring: hsl(262 83% 67%);
+
+  --success: hsl(142 72% 48%);
+  --success-muted: hsl(142 50% 10%);
+  --warning: hsl(38 90% 55%);
+  --warning-muted: hsl(38 80% 11%);
+  --info: hsl(210 85% 62%);
+  --info-muted: hsl(210 75% 11%);
+  --overdue: hsl(0 80% 62%);
+  --overdue-muted: hsl(0 70% 11%);
 }
 
 @theme inline {
@@ -42,10 +64,20 @@
   --color-muted: var(--muted);
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-success: var(--success);
+  --color-success-muted: var(--success-muted);
+  --color-warning: var(--warning);
+  --color-warning-muted: var(--warning-muted);
+  --color-info: var(--info);
+  --color-info-muted: var(--info-muted);
+  --color-overdue: var(--overdue);
+  --color-overdue-muted: var(--overdue-muted);
 }
 
 * { border-color: var(--border); }
@@ -79,3 +111,10 @@ body {
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
   z-index: 1;
 }
+
+/* ─── Badge utilities ─────────────────────────────────── */
+.badge-overdue  { color: var(--overdue);  background: var(--overdue-muted);  border: 1px solid color-mix(in srgb, var(--overdue)  30%, transparent); }
+.badge-warning  { color: var(--warning);  background: var(--warning-muted);  border: 1px solid color-mix(in srgb, var(--warning)  30%, transparent); }
+.badge-success  { color: var(--success);  background: var(--success-muted);  border: 1px solid color-mix(in srgb, var(--success)  30%, transparent); }
+.badge-info     { color: var(--info);     background: var(--info-muted);     border: 1px solid color-mix(in srgb, var(--info)     30%, transparent); }
+.badge-primary  { color: var(--primary);  background: color-mix(in srgb, var(--primary) 10%, transparent); border: 1px solid color-mix(in srgb, var(--primary) 25%, transparent); }

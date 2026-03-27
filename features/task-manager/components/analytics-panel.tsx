@@ -113,17 +113,17 @@ export function AnalyticsPanel({ token, boardId, onClose }: Props) {
               </div>
               <div className="glass border border-border rounded-xl p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                  <CheckCircle2 className="w-3.5 h-3.5 text-success" />
                   <span className="text-xs text-muted-foreground">Completed</span>
                 </div>
-                <p className="text-2xl font-bold text-green-400">{data.byStatus.done ?? 0}</p>
+                <p className="text-2xl font-bold text-success">{data.byStatus.done ?? 0}</p>
               </div>
               <div className="glass border border-border rounded-xl p-3">
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Clock className="w-3.5 h-3.5 text-amber-400" />
+                  <Clock className="w-3.5 h-3.5 text-warning" />
                   <span className="text-xs text-muted-foreground">In progress</span>
                 </div>
-                <p className="text-2xl font-bold text-amber-400">{data.byStatus.in_progress ?? 0}</p>
+                <p className="text-2xl font-bold text-warning">{data.byStatus.in_progress ?? 0}</p>
               </div>
               <div className="glass border border-border rounded-xl p-3">
                 <div className="flex items-center gap-1.5 mb-1">
@@ -138,7 +138,7 @@ export function AnalyticsPanel({ token, boardId, onClose }: Props) {
             <div>
               <p className="text-xs font-medium text-muted-foreground mb-2">Completions — last 14 days</p>
               <div className="glass border border-border rounded-xl p-3">
-                <MiniChart data={data.dailyCompletions} color="bg-green-500" />
+                <MiniChart data={data.dailyCompletions} color="bg-success" />
               </div>
             </div>
 
@@ -155,9 +155,9 @@ export function AnalyticsPanel({ token, boardId, onClose }: Props) {
               <p className="text-xs font-medium text-muted-foreground mb-3">By status</p>
               <div className="space-y-2">
                 {[
-                  { key: 'todo',        label: 'Todo',        color: 'bg-slate-400' },
-                  { key: 'in_progress', label: 'In Progress', color: 'bg-amber-400' },
-                  { key: 'done',        label: 'Done',        color: 'bg-green-500' },
+                  { key: 'todo',        label: 'Todo',        color: 'bg-muted-foreground' },
+                  { key: 'in_progress', label: 'In Progress', color: 'bg-warning'          },
+                  { key: 'done',        label: 'Done',        color: 'bg-success'           },
                 ].map(({ key, label, color }) => (
                   <div key={key}>
                     <div className="flex justify-between text-xs mb-1">
@@ -174,9 +174,9 @@ export function AnalyticsPanel({ token, boardId, onClose }: Props) {
               <p className="text-xs font-medium text-muted-foreground mb-3">By priority</p>
               <div className="space-y-2">
                 {[
-                  { key: 'high',   label: 'High',   color: 'bg-red-500'   },
-                  { key: 'medium', label: 'Medium', color: 'bg-amber-400' },
-                  { key: 'low',    label: 'Low',    color: 'bg-slate-400' },
+                  { key: 'high',   label: 'High',   color: 'bg-destructive'      },
+                  { key: 'medium', label: 'Medium', color: 'bg-warning'          },
+                  { key: 'low',    label: 'Low',    color: 'bg-muted-foreground' },
                 ].map(({ key, label, color }) => (
                   <div key={key}>
                     <div className="flex justify-between text-xs mb-1">
@@ -192,7 +192,7 @@ export function AnalyticsPanel({ token, boardId, onClose }: Props) {
 
         {!loading && error && (
           <div className="flex flex-col items-center justify-center gap-3 py-16 px-5 text-center">
-            <p className="text-sm text-red-400">{error}</p>
+            <p className="text-sm text-destructive">{error}</p>
             <button
               onClick={loadAnalytics}
               className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"

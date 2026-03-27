@@ -27,9 +27,9 @@ function getDueDateStyle(dueDate: string | null | undefined): { label: string; c
   const dueDay = new Date(due.getFullYear(), due.getMonth(), due.getDate());
   const diffDays = Math.ceil((dueDay.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
   const label = due.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-  if (diffDays < 0) return { label: `Overdue · ${label}`, className: 'text-red-400 bg-red-500/10 border border-red-500/20' };
-  if (diffDays === 0) return { label: `Due today · ${label}`, className: 'text-orange-400 bg-orange-500/10 border border-orange-500/20' };
-  if (diffDays <= 3) return { label: `Due soon · ${label}`, className: 'text-yellow-400 bg-yellow-500/10 border border-yellow-500/20' };
+  if (diffDays < 0) return { label: `Overdue · ${label}`, className: 'badge-overdue' };
+  if (diffDays === 0) return { label: `Due today · ${label}`, className: 'badge-overdue' };
+  if (diffDays <= 3) return { label: `Due soon · ${label}`, className: 'badge-warning' };
   return { label, className: 'text-muted-foreground bg-muted/50' };
 }
 
@@ -157,7 +157,7 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
       {/* Blocked badge */}
       {task.blockedBy && task.blockedBy.length > 0 && (
         <div className="mt-1.5 ml-6">
-          <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400 font-medium">
+          <span className="badge-overdue inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium">
             🔒 Blocked
           </span>
         </div>
@@ -170,12 +170,12 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
             {priority.label}
           </span>
           {task.recurrence && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
+            <span className="badge-info text-[10px] px-1.5 py-0.5 rounded-full">
               ↻ {task.recurrence}
             </span>
           )}
           {task.sprintId && (
-            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
+            <span className="badge-primary text-[10px] px-1.5 py-0.5 rounded-full">
               ⚡ Sprint
             </span>
           )}

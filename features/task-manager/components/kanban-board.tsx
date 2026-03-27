@@ -246,7 +246,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   );
 
   if (error) return (
-    <div className="text-center py-16 text-red-400">{error}</div>
+    <div className="text-center py-16 text-destructive">{error}</div>
   );
 
   return (
@@ -439,7 +439,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             {/* Bulk delete */}
             <button
               onClick={() => setConfirmBulkDelete(true)}
-              className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
+              className="text-xs px-3 py-1.5 rounded-lg bg-destructive/10 text-destructive border border-destructive/20 hover:bg-destructive/20 transition-colors"
             >
               Delete {selected.size}
             </button>
@@ -552,8 +552,8 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             key={toast.id}
             className={`glass rounded-lg px-4 py-2 text-sm border pointer-events-auto transition-all ${
               toast.type === 'success'
-                ? 'border-green-500/50 text-green-400'
-                : 'border-red-500/50 text-red-400'
+                ? 'border-success/50 text-success'
+                : 'border-destructive/50 text-destructive'
             }`}
           >
             {toast.message}
