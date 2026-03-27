@@ -89,8 +89,8 @@
 - `kanban-column.tsx`: AnimatePresence + motion.div for task enter/exit + empty state fade
 - `kanban-board.tsx`: label filter chips (toggle, clear all); `aria-live="polite"` region
 
-**Next:** Push to production (`vercel --prod` from `E:\GITPRJ\taskflow\` if auto-deploy doesn't trigger)
-**Remaining:** Tier 3 (task expand animation, drag easing, mobile toolbar, sprint badge on card)
+**Tier 3 commit:** `24867e8` — task expand animation, spring drag, sprint badge, mobile toolbar
+**Next:** Push to production — `git push` then `vercel --prod` if auto-deploy doesn't trigger within 2 min
 
 ---
 
