@@ -289,27 +289,30 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           <button
             onClick={() => setEditingColumns(v => !v)}
             title="Manage columns"
+            aria-label="Manage columns"
             className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Columns className="w-3.5 h-3.5" />
-            Columns
+            <span className="hidden sm:inline">Columns</span>
           </button>
 
           <button
             onClick={() => setShowAnalytics(true)}
             title="View analytics"
+            aria-label="Analytics"
             className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
           >
             <BarChart2 className="w-3.5 h-3.5" />
-            Analytics
+            <span className="hidden sm:inline">Analytics</span>
           </button>
 
           <button
             onClick={() => setShowMembers(true)}
+            aria-label="Members"
             className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
           >
             <Users className="w-3.5 h-3.5" />
-            Members
+            <span className="hidden sm:inline">Members</span>
           </button>
 
           <div className="relative" ref={exportRef}>
@@ -317,10 +320,11 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
               onClick={() => setExportOpen(v => !v)}
               aria-haspopup="true"
               aria-expanded={exportOpen}
+              aria-label="Export"
               className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
-              Export
+              <span className="hidden sm:inline">Export</span>
             </button>
             {exportOpen && (
               <div

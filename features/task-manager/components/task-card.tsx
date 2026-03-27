@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useRef, useMemo, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar } from 'lucide-react';
 import { type Task, PRIORITY_CONFIG, COLUMNS } from '../types';
 import { cn } from '@/lib/utils';
@@ -127,9 +128,20 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
             <ChevronDown className={cn('w-3 h-3 transition-transform', expanded && 'rotate-180')} />
             {expanded ? 'Hide' : 'Details'}
           </button>
-          {expanded && (
-            <p className="mt-1.5 text-xs text-muted-foreground leading-relaxed">{task.description}</p>
-          )}
+          <AnimatePresence initial={false}>
+            {expanded && (
+              <motion.p
+                key="desc"
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mt-1.5 text-xs text-muted-foreground leading-relaxed overflow-hidden"
+              >
+                {task.description}
+              </motion.p>
+            )}
+          </AnimatePresence>
         </div>
       )}
 
@@ -160,6 +172,11 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
           {task.recurrence && (
             <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-blue-500/10 text-blue-400 border border-blue-500/20">
               ↻ {task.recurrence}
+            </span>
+          )}
+          {task.sprintId && (
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-violet-500/10 text-violet-400 border border-violet-500/20">
+              ⚡ Sprint
             </span>
           )}
         </div>

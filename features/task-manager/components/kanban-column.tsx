@@ -94,8 +94,8 @@ function KanbanColumn({
               key={task.id}
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ duration: 0.15 }}
+              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
+              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
             >
               <TaskCard
                 task={task}
