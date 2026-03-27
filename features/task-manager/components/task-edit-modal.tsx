@@ -275,7 +275,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
         role="dialog"
         aria-modal="true"
         aria-labelledby="edit-task-title"
-        className="glass border border-border rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]"
+        className="bg-background border border-border rounded-2xl w-full max-w-lg shadow-2xl flex flex-col max-h-[90vh]"
         onClick={e => e.stopPropagation()}
       >
         {/* Modal header */}
