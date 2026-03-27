@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { Plus, Inbox } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { type Task, type TaskStatus, PRIORITY_CONFIG } from '../types';
 import { TaskCard } from './task-card';
 import { cn } from '@/lib/utils';
@@ -70,7 +71,7 @@ function KanbanColumn({
           </span>
           <button
             onClick={() => onSelectAll?.(tasks.map(t => t.id))}
-            className="opacity-0 group-hover:opacity-100 text-[10px] text-muted-foreground hover:text-foreground transition-all ml-auto"
+            className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[10px] text-muted-foreground hover:text-foreground transition-all ml-auto focus:outline-none focus:ring-2 focus:ring-primary rounded"
           >
             Select all
           </button>
@@ -87,28 +88,44 @@ function KanbanColumn({
 
       {/* Tasks — Fix M2: remove hard-coded max-h, let column grow naturally */}
       <div className="flex-1 p-3 space-y-2 overflow-y-auto">
-        {tasks.map(task => (
-          <TaskCard
-            key={task.id}
-            task={task}
-            onDelete={onDelete}
-            onStatusChange={onStatusChange}
-            isDragging={draggingId === task.id}
-            onDragStart={onDragStart}
-            onDragEnd={onDragEnd} // Fix K1: pass through
-            onEdit={onEdit}
-            isSelected={selected?.has(task.id)}
-            onToggleSelect={onToggleSelect}
-          />
-        ))}
+        <AnimatePresence initial={false}>
+          {tasks.map(task => (
+            <motion.div
+              key={task.id}
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.15 }}
+            >
+              <TaskCard
+                task={task}
+                onDelete={onDelete}
+                onStatusChange={onStatusChange}
+                isDragging={draggingId === task.id}
+                onDragStart={onDragStart}
+                onDragEnd={onDragEnd} // Fix K1: pass through
+                onEdit={onEdit}
+                isSelected={selected?.has(task.id)}
+                onToggleSelect={onToggleSelect}
+              />
+            </motion.div>
+          ))}
 
-        {/* Empty column state */}
-        {tasks.length === 0 && !adding && (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/30 border-2 border-dashed border-border/50 rounded-xl mx-1 gap-1.5">
-            <Inbox className="w-5 h-5" />
-            <p className="text-xs">No tasks</p>
-          </div>
-        )}
+          {/* Empty column state */}
+          {tasks.length === 0 && !adding && (
+            <motion.div
+              key="empty"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/30 border-2 border-dashed border-border/50 rounded-xl mx-1 gap-1.5">
+                <Inbox className="w-5 h-5" />
+                <p className="text-xs">No tasks</p>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
         {/* Add task inline form */}
         {adding ? (
@@ -119,14 +136,14 @@ function KanbanColumn({
               onChange={e => setTitle(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter') submit(); if (e.key === 'Escape') setAdding(false); }}
               placeholder="Task title..."
-              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground/50"
+              className="w-full bg-transparent text-sm outline-none placeholder:text-muted-foreground"
             />
             <textarea
               value={desc}
               onChange={e => setDesc(e.target.value)}
               placeholder="Description (optional)"
               rows={2}
-              className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground/50 resize-none"
+              className="w-full bg-transparent text-xs outline-none placeholder:text-muted-foreground resize-none"
             />
             <div className="flex items-center justify-between">
               <select

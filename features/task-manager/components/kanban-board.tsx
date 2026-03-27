@@ -55,6 +55,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, createSprint, deleteSprint } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask]   = useState<Task | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const lastFocusRef = useRef<HTMLElement | null>(null);
   // Derive live task from tasks array so modal always reflects latest state
   const editingTask = editingTaskId != null ? (tasks.find(t => t.id === editingTaskId) ?? null) : null;
 
@@ -69,6 +70,15 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
 
   // Sprint filter state
   const [activeSprint, setActiveSprint] = useState<number | 'backlog' | null>(null);
+
+  // Label filter state
+  const [labelFilter, setLabelFilter] = useState<Set<number>>(new Set());
+  const toggleLabelFilter = (id: number) =>
+    setLabelFilter(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
 
   // Derive active columns from board prop, falling back to defaults
   const columns: BoardColumn[] = (board?.columns as BoardColumn[] | null) ?? DEFAULT_COLUMNS;
@@ -224,6 +234,10 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
       ? filtered.filter(t => !t.sprintId)
       : filtered.filter(t => t.sprintId === activeSprint);
 
+  const labelFiltered = labelFilter.size === 0
+    ? sprintFiltered
+    : sprintFiltered.filter(t => t.labels?.some(l => labelFilter.has(l.id)));
+
   if (loading) return (
     <div className="flex items-center justify-center py-24 text-muted-foreground">
       <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3" />
@@ -263,6 +277,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           <select
             value={sortKey}
             onChange={e => setSortKey(e.target.value as SortKey)}
+            aria-label="Sort tasks by"
             className="text-xs bg-background border border-border rounded-lg px-2 py-1.5 outline-none focus:border-primary transition-colors cursor-pointer"
           >
             <option value="default">Default</option>
@@ -300,15 +315,21 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           <div className="relative" ref={exportRef}>
             <button
               onClick={() => setExportOpen(v => !v)}
+              aria-haspopup="true"
+              aria-expanded={exportOpen}
               className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
             >
               <Download className="w-3.5 h-3.5" />
               Export
             </button>
             {exportOpen && (
-              <div className="absolute right-0 top-full mt-1 z-20 glass border border-border rounded-xl shadow-xl py-1 w-36">
-                <button onClick={() => { handleExport('csv'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">CSV Spreadsheet</button>
-                <button onClick={() => { handleExport('ics'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">Calendar (.ics)</button>
+              <div
+                role="menu"
+                className="absolute right-0 top-full mt-1 z-20 glass border border-border rounded-xl shadow-xl py-1 w-36"
+                onKeyDown={e => { if (e.key === 'Escape') setExportOpen(false); }}
+              >
+                <button role="menuitem" onClick={() => { handleExport('csv'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">CSV Spreadsheet</button>
+                <button role="menuitem" onClick={() => { handleExport('ics'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">Calendar (.ics)</button>
               </div>
             )}
           </div>
@@ -321,6 +342,35 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           onSave={async (cols) => { await onColumnsUpdate(cols); setEditingColumns(false); }}
           onCancel={() => setEditingColumns(false)}
         />
+      )}
+
+      {/* Label filter chips */}
+      {labels.length > 0 && (
+        <div className="flex items-center gap-2 mb-3 flex-wrap">
+          <span className="text-xs text-muted-foreground shrink-0">Filter:</span>
+          {labels.map(label => (
+            <button
+              key={label.id}
+              onClick={() => toggleLabelFilter(label.id)}
+              aria-pressed={labelFilter.has(label.id)}
+              className={`text-xs px-2.5 py-1 rounded-full border transition-all ${
+                labelFilter.has(label.id)
+                  ? 'bg-primary/20 border-primary/50 text-primary'
+                  : 'bg-background/60 border-border text-muted-foreground hover:border-primary/30 hover:text-foreground'
+              }`}
+            >
+              {label.name}
+            </button>
+          ))}
+          {labelFilter.size > 0 && (
+            <button
+              onClick={() => setLabelFilter(new Set())}
+              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
       )}
 
       <SprintSelector
@@ -339,6 +389,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             {/* Move to status */}
             <select
               defaultValue=""
+              aria-label="Move selected tasks to"
               onChange={async e => {
                 const status = e.target.value as TaskStatus;
                 if (!status) return;
@@ -361,6 +412,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             {/* Change priority */}
             <select
               defaultValue=""
+              aria-label="Set priority for selected tasks"
               onChange={async e => {
                 const priority = e.target.value as TaskPriority;
                 if (!priority) return;
@@ -402,7 +454,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             status={col.key as TaskStatus}
             label={col.label}
             colorClass={col.color ?? ''}
-            tasks={sortTasks(sprintFiltered.filter(t => t.status === col.key), sortKey)}
+            tasks={sortTasks(labelFiltered.filter(t => t.status === col.key), sortKey)}
             onDrop={handleDrop}
             onDragStart={handleDragStart}
             onDragEnd={handleDragEnd} // Fix K1
@@ -413,7 +465,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             }}
             onStatusChange={moveTask}
             onAddTask={handleAddTask} // Fix K5
-            onEdit={task => { setEditingTaskId(task.id); fetchActivity(task.id); fetchSubtasks(task.id); fetchComments(task.id); }}
+            onEdit={task => { lastFocusRef.current = document.activeElement as HTMLElement; setEditingTaskId(task.id); fetchActivity(task.id); fetchSubtasks(task.id); fetchComments(task.id); }}
             selected={selected}
             onToggleSelect={toggleSelect}
             onSelectAll={(ids) => setSelected(prev => new Set([...prev, ...ids]))}
@@ -432,7 +484,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         <TaskEditModal
           task={editingTask}
           onSave={async (id, data) => { await updateTask(id, data); }}
-          onClose={() => setEditingTaskId(null)}
+          onClose={() => { setEditingTaskId(null); setTimeout(() => lastFocusRef.current?.focus(), 0); }}
           labels={labels}
           onAddLabel={(labelId) => addTaskLabel(editingTask.id, labelId)}
           onRemoveLabel={(labelId) => removeTaskLabel(editingTask.id, labelId)}
@@ -485,6 +537,9 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           {undoToast}
         </div>
       )}
+
+      {/* Screen reader live region */}
+      <div aria-live="polite" aria-atomic="true" className="sr-only" id="board-status" />
 
       {/* Fix K5: Toast stack */}
       <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 pointer-events-none">
