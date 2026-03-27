@@ -92,10 +92,10 @@ function KanbanColumn({
           {tasks.map(task => (
             <motion.div
               key={task.id}
-              initial={{ opacity: 0, y: -8 }}
+              initial={{ opacity: 0, y: -6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, scale: 0.95, transition: { duration: 0.12 } }}
-              transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+              exit={{ opacity: 0, transition: { duration: 0.06 } }}
+              transition={{ duration: 0.12, ease: 'easeOut' }}
             >
               <TaskCard
                 task={task}

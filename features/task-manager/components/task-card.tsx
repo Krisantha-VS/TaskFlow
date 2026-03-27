@@ -60,7 +60,7 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
         onEdit(task);
       }}
       className={cn(
-        'relative glass rounded-xl p-4 cursor-grab active:cursor-grabbing border border-border transition-all group',
+        'relative glass rounded-xl p-4 cursor-grab active:cursor-grabbing border border-border transition-[opacity,transform,box-shadow] group',
         isDragging && 'opacity-40 scale-95',
         isSelected && 'ring-1 ring-primary/40'
       )}
