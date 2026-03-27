@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -12,6 +13,7 @@ async function getUser(req: NextRequest) {
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const id = parseInt((await params).id);
     if (!id || id < 1) return fail('Invalid label id', 400);
     // Verify ownership via board

@@ -11,5 +11,14 @@ export function checkRateLimit(userId: string): boolean {
   if (timestamps.length >= MAX_REQUESTS) return false;
   timestamps.push(now);
   windows.set(userId, timestamps);
+
+  // Evict entries where the user's last request is older than 2 minutes
+  const EVICT_MS = 120_000;
+  for (const [uid, ts] of windows) {
+    if (ts.length === 0 || now - ts[ts.length - 1] > EVICT_MS) {
+      windows.delete(uid);
+    }
+  }
+
   return true;
 }

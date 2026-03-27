@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import React, { useRef, useMemo, useState } from 'react';
 import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar } from 'lucide-react';
 import { type Task, PRIORITY_CONFIG, COLUMNS } from '../types';
 import { cn } from '@/lib/utils';
@@ -32,10 +32,10 @@ function getDueDateStyle(dueDate: string | null | undefined): { label: string; c
   return { label, className: 'text-muted-foreground bg-muted/50' };
 }
 
-export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onDragEnd, onEdit, isSelected, onToggleSelect }: Props) {
+function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onDragEnd, onEdit, isSelected, onToggleSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
   const priority = PRIORITY_CONFIG[task.priority];
-  const due = getDueDateStyle(task.due_date);
+  const due = useMemo(() => getDueDateStyle(task.due_date), [task.due_date]);
 
   // Fix K4: track whether a drag occurred to suppress click-to-edit after drop
   const didDrag = useRef(false);
@@ -67,7 +67,9 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
       {/* Selection checkbox */}
       <button
         onClick={e => { e.stopPropagation(); onToggleSelect?.(task.id); }}
-        className={`absolute top-2 left-2 w-4 h-4 rounded border flex items-center justify-center transition-all z-10 ${
+        aria-label={isSelected ? `Deselect task: ${task.title}` : `Select task: ${task.title}`}
+        aria-pressed={isSelected}
+        className={`absolute top-2 left-2 w-4 h-4 rounded border flex items-center justify-center transition-all z-10 focus:outline-none focus:ring-2 focus:ring-primary ${
           isSelected
             ? 'bg-primary border-primary opacity-100'
             : 'border-border bg-background opacity-0 group-hover:opacity-100'
@@ -99,7 +101,7 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
         <button
           onClick={e => { e.stopPropagation(); onEdit(task); }}
           aria-label={`Edit task: ${task.title}`}
-          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all shrink-0"
+          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary rounded"
         >
           <Pencil className="w-3.5 h-3.5" />
         </button>
@@ -107,7 +109,7 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
         <button
           onClick={e => { e.stopPropagation(); onDelete(task.id); }}
           aria-label={`Delete task: ${task.title}`}
-          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all shrink-0"
+          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary rounded"
         >
           <Trash2 className="w-3.5 h-3.5" />
         </button>
@@ -118,7 +120,9 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
         <div className="mt-2 ml-6">
           <button
             onClick={e => { e.stopPropagation(); setExpanded(!expanded); }}
-            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors"
+            aria-label={expanded ? 'Collapse task details' : 'Expand task details'}
+            aria-expanded={expanded}
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded"
           >
             <ChevronDown className={cn('w-3 h-3 transition-transform', expanded && 'rotate-180')} />
             {expanded ? 'Hide' : 'Details'}
@@ -182,7 +186,8 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
           <ChevronRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />
           <label className="text-xs text-muted-foreground/60 shrink-0">Move to:</label>
           <select
-            className="text-xs bg-background border border-border rounded px-2 py-1 outline-none"
+            aria-label="Move task to column"
+            className="text-xs bg-background border border-border rounded px-2 py-1 outline-none focus:ring-2 focus:ring-primary"
             defaultValue=""
             onChange={e => {
               const val = e.target.value as Task['status'];
@@ -200,3 +205,11 @@ export function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragSta
     </div>
   );
 }
+
+TaskCard.displayName = 'TaskCard';
+
+const MemoTaskCard = React.memo(TaskCard);
+MemoTaskCard.displayName = 'TaskCard';
+
+export { MemoTaskCard as TaskCard };
+export default MemoTaskCard;

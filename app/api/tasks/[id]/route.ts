@@ -33,34 +33,43 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if ('due_date' in body)             update.dueDate     = body.due_date ? new Date(body.due_date) : null;
     if (body.recurrence !== undefined)  update.recurrence  = body.recurrence ?? null;
 
-    // FIX: use updateMany with userId in where to prevent TOCTOU, then re-fetch
-    await db.task.updateMany({ where: { id, userId }, data: update });
-    const updated = await db.task.findFirst({ where: { id, userId } });
     const changes = Object.keys(update).join(', ');
-    logActivity({ boardId: task.boardId, userId, action: 'updated', taskId: id, detail: changes });
 
-    // Auto-spawn next occurrence when recurring task is completed
-    if (body.status === 'done' && updated?.recurrence) {
-      const base = updated.dueDate ? new Date(updated.dueDate) : new Date();
+    // Determine whether a recurrence spawn is needed before committing
+    const willSpawn = body.status === 'done' && task.recurrence;
+
+    if (willSpawn) {
+      // Wrap update + new occurrence creation in a single transaction
+      const base = task.dueDate ? new Date(task.dueDate) : new Date();
+      const y = base.getFullYear(), mo = base.getMonth(), d = base.getDate();
       let next: Date;
-      if (updated.recurrence === 'daily')        next = new Date(base.setDate(base.getDate() + 1));
-      else if (updated.recurrence === 'weekly')  next = new Date(base.setDate(base.getDate() + 7));
-      else /* monthly */                         next = new Date(base.setMonth(base.getMonth() + 1));
+      if (task.recurrence === 'daily')       next = new Date(y, mo, d + 1);
+      else if (task.recurrence === 'weekly') next = new Date(y, mo, d + 7);
+      else /* monthly */                     next = new Date(y, mo + 1, d);
 
-      await db.task.create({
-        data: {
-          boardId:     updated.boardId,
-          userId:      updated.userId,
-          title:       updated.title,
-          description: updated.description,
-          priority:    updated.priority,
-          status:      'todo',
-          position:    0,
-          recurrence:  updated.recurrence,
-          dueDate:     next,
-        },
-      });
+      await db.$transaction([
+        db.task.updateMany({ where: { id, userId }, data: update }),
+        db.task.create({
+          data: {
+            boardId:     task.boardId,
+            userId:      task.userId,
+            title:       task.title,
+            description: task.description,
+            priority:    task.priority,
+            status:      'todo',
+            position:    0,
+            recurrence:  task.recurrence,
+            dueDate:     next,
+          },
+        }),
+      ]);
+    } else {
+      // FIX: use updateMany with userId in where to prevent TOCTOU
+      await db.task.updateMany({ where: { id, userId }, data: update });
     }
+
+    const updated = await db.task.findFirst({ where: { id, userId } });
+    logActivity({ boardId: task.boardId, userId, action: 'updated', taskId: id, detail: changes });
 
     return ok(updated);
   } catch (e) {

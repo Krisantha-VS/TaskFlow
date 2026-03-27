@@ -18,12 +18,18 @@ export function SprintSelector({ sprints, activeSprint, onSelect, onCreateSprint
   const [newStart, setNewStart] = useState('');
   const [newEnd, setNewEnd] = useState('');
   const [saving, setSaving] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const handleCreate = async () => {
     if (!newName.trim()) return;
     setSaving(true);
     await onCreateSprint(newName.trim(), newStart || undefined, newEnd || undefined);
     setNewName(''); setNewStart(''); setNewEnd(''); setCreating(false); setSaving(false);
+  };
+
+  const handleConfirmDelete = async (id: number) => {
+    setConfirmDeleteId(null);
+    await onDeleteSprint(id);
   };
 
   return (
@@ -44,21 +50,42 @@ export function SprintSelector({ sprints, activeSprint, onSelect, onCreateSprint
         </button>
         {sprints.map(s => (
           <div key={s.id} className="flex items-center gap-0.5 group">
-            <button
-              onClick={() => onSelect(s.id)}
-              className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${activeSprint === s.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
-            >
-              {s.name}
-              {s.endDate && (
-                <span className="ml-1 opacity-60">· {new Date(s.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
-              )}
-            </button>
-            <button
-              onClick={() => onDeleteSprint(s.id)}
-              className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-0.5"
-            >
-              <Trash2 className="w-3 h-3" />
-            </button>
+            {confirmDeleteId === s.id ? (
+              <div className="flex items-center gap-1 text-xs px-2 py-1 rounded-full border border-destructive/50 bg-destructive/10">
+                <span className="text-foreground">Delete sprint?</span>
+                <button
+                  onClick={() => handleConfirmDelete(s.id)}
+                  className="text-destructive font-medium hover:text-destructive/80 transition-colors"
+                >
+                  Confirm
+                </button>
+                <span className="text-muted-foreground">·</span>
+                <button
+                  onClick={() => setConfirmDeleteId(null)}
+                  className="text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <>
+                <button
+                  onClick={() => onSelect(s.id)}
+                  className={`text-xs px-2.5 py-1 rounded-full border transition-colors ${activeSprint === s.id ? 'bg-primary text-primary-foreground border-primary' : 'border-border text-muted-foreground hover:border-primary/50 hover:text-foreground'}`}
+                >
+                  {s.name}
+                  {s.endDate && (
+                    <span className="ml-1 opacity-60">· {new Date(s.endDate).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
+                  )}
+                </button>
+                <button
+                  onClick={() => setConfirmDeleteId(s.id)}
+                  className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all p-0.5"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </>
+            )}
           </div>
         ))}
 

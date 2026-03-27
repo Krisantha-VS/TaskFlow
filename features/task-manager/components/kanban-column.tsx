@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
+import React, { useState } from 'react';
+import { Plus, Inbox } from 'lucide-react';
 import { type Task, type TaskStatus, PRIORITY_CONFIG } from '../types';
 import { TaskCard } from './task-card';
 import { cn } from '@/lib/utils';
@@ -24,7 +24,7 @@ interface Props {
   onSelectAll?: (ids: number[]) => void;
 }
 
-export function KanbanColumn({
+function KanbanColumn({
   status, label, colorClass, tasks,
   onDrop, onDragStart, onDragEnd, draggingId,
   onDelete, onStatusChange, onAddTask, onEdit,
@@ -102,11 +102,11 @@ export function KanbanColumn({
           />
         ))}
 
-        {/* Fix M6: empty column drop target visual */}
+        {/* Empty column state */}
         {tasks.length === 0 && !adding && (
-          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/40 border-2 border-dashed border-border rounded-xl mx-1">
-            <p className="text-xs">No tasks yet</p>
-            <p className="text-xs">Drop here or click +</p>
+          <div className="flex flex-col items-center justify-center py-8 text-muted-foreground/30 border-2 border-dashed border-border/50 rounded-xl mx-1 gap-1.5">
+            <Inbox className="w-5 h-5" />
+            <p className="text-xs">No tasks</p>
           </div>
         )}
 
@@ -156,3 +156,11 @@ export function KanbanColumn({
     </div>
   );
 }
+
+KanbanColumn.displayName = 'KanbanColumn';
+
+const MemoKanbanColumn = React.memo(KanbanColumn);
+MemoKanbanColumn.displayName = 'KanbanColumn';
+
+export { MemoKanbanColumn as KanbanColumn };
+export default MemoKanbanColumn;

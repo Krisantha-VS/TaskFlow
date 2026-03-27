@@ -45,6 +45,9 @@ export async function refreshAccessToken(): Promise<string | null> {
       return null;
     }
 
+    if (!json.data?.accessToken || !json.data?.refreshToken) {
+      throw new Error('Auth error: token refresh response missing accessToken or refreshToken');
+    }
     const { accessToken, refreshToken: newRefresh } = json.data;
     storeTokens(accessToken, newRefresh ?? refreshToken);
     return accessToken;

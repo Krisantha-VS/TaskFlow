@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { LabelCreateSchema } from '@/lib/validate';
 
 async function getUser(req: NextRequest) {
@@ -27,6 +28,7 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const body = await req.json();
     const boardId = parseInt(body.board_id);
     if (!boardId || boardId < 1) return fail('board_id required', 400);

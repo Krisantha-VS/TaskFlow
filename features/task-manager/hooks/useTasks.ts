@@ -18,17 +18,22 @@ export function useTasks(token: string | null, boardId: number | null) {
     setLoading(true);
     setError(null);
     try {
-      const [tasksData, labelsData] = await Promise.all([
-        taskApi.getTasks(token, boardId),
-        taskApi.getLabels(token, boardId),
-      ]);
+      const tasksData = await taskApi.getTasks(token, boardId);
       setTasks(tasksData);
-      setLabels(labelsData);
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load tasks');
     } finally {
       setLoading(false);
     }
+  }, [token, boardId]);
+
+  // Lazy labels — fetch only when needed (e.g. when task edit modal opens)
+  const fetchLabels = useCallback(async () => {
+    if (!token || !boardId) return;
+    try {
+      const data = await taskApi.getLabels(token, boardId);
+      setLabels(data);
+    } catch { /* non-critical */ }
   }, [token, boardId]);
 
   useEffect(() => { load(); }, [load]);
@@ -60,8 +65,25 @@ export function useTasks(token: string | null, boardId: number | null) {
             if (!dataLine) continue;
             try {
               const event = JSON.parse(dataLine.slice(6));
-              if (event.type === 'activity') {
-                // Re-fetch tasks to reflect the change
+              const { type, data } = event;
+
+              if (type === 'task_created' && data?.task) {
+                // Append new task only if not already present (guard against own mutation echo)
+                setTasks(prev => prev.some(t => t.id === data.task.id) ? prev : [...prev, data.task]);
+              } else if (type === 'task_updated' && data?.task) {
+                // Replace the existing task by id; if not found, fall back to full refetch
+                setTasks(prev => {
+                  const idx = prev.findIndex(t => t.id === data.task.id);
+                  if (idx === -1) { load(); return prev; }
+                  return prev.map(t => t.id === data.task.id ? data.task : t);
+                });
+              } else if (type === 'task_moved' && data?.task) {
+                // Update status/column fields in state
+                setTasks(prev => prev.map(t => t.id === data.task.id ? data.task : t));
+              } else if (type === 'task_deleted' && data?.taskId) {
+                setTasks(prev => prev.filter(t => t.id !== data.taskId));
+              } else {
+                // Unknown event type or missing task payload — full refetch as safety net
                 load();
               }
             } catch { /* ignore parse errors */ }
@@ -272,6 +294,15 @@ export function useTasks(token: string | null, boardId: number | null) {
     } catch { /* non-critical */ }
   }, [token]);
 
+  // Parallel fetch for task modal — replaces sequential fetchActivity/fetchSubtasks/fetchComments calls
+  const fetchModalData = useCallback(async (taskId: number) => {
+    await Promise.all([
+      fetchActivity(taskId),
+      fetchSubtasks(taskId),
+      fetchComments(taskId),
+    ]);
+  }, [fetchActivity, fetchSubtasks, fetchComments]);
+
   const addComment = useCallback(async (taskId: number, text: string) => {
     if (!token) return;
     try {
@@ -321,7 +352,7 @@ export function useTasks(token: string | null, boardId: number | null) {
     try { await taskApi.updateTask(token, taskId, { sprintId } as never); } catch { await load(); }
   }, [token, load]);
 
-  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, fetchSprints, createSprint, deleteSprint, setTaskSprint, reload: load };
+  return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, fetchLabels, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, fetchModalData, addComment, deleteComment, sprints, fetchSprints, createSprint, deleteSprint, setTaskSprint, reload: load };
 }
 
 export function useBoards(token: string | null) {

@@ -51,13 +51,30 @@ interface Props {
 export function AnalyticsPanel({ token, boardId, onClose }: Props) {
   const [data, setData] = useState<Analytics | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
+  const loadAnalytics = () => {
+    setLoading(true);
+    setError(null);
     taskApi.getAnalytics(token, boardId)
       .then(setData)
-      .catch(() => null)
+      .catch(() => setError('Failed to load analytics. Try again.'))
       .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    loadAnalytics();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token, boardId]);
+
+  // Escape to close — matches task-edit-modal.tsx pattern
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [onClose]);
 
   return (
     <div className="fixed inset-0 z-50 flex justify-end" onClick={onClose}>
@@ -173,8 +190,16 @@ export function AnalyticsPanel({ token, boardId, onClose }: Props) {
           </div>
         )}
 
-        {!loading && !data && (
-          <p className="text-center text-sm text-muted-foreground py-16">Failed to load analytics.</p>
+        {!loading && error && (
+          <div className="flex flex-col items-center justify-center gap-3 py-16 px-5 text-center">
+            <p className="text-sm text-red-400">{error}</p>
+            <button
+              onClick={loadAnalytics}
+              className="text-xs px-3 py-1.5 rounded-lg bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Try again
+            </button>
+          </div>
         )}
       </div>
     </div>

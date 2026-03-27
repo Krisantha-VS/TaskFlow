@@ -83,6 +83,7 @@ model ActivityLog {
 
   @@index([taskId])
   @@index([boardId, createdAt])
+  @@index([userId, createdAt])
 }
 
 model Subtask {
@@ -118,6 +119,7 @@ model TaskDependency {
 
   @@unique([blockerId, blockedId])
   @@index([blockedId])
+  @@index([blockerId])
 }
 
 model Sprint {

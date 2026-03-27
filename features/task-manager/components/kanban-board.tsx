@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
-import { Search, Columns, Download, BarChart2, Users } from 'lucide-react';
+import { Search, X, Columns, Download, BarChart2, Users } from 'lucide-react';
 import { DEFAULT_COLUMNS, type Board, type BoardColumn, type Task, type TaskStatus, type TaskPriority } from '../types';
 import { KanbanColumn } from './kanban-column';
 import { TaskEditModal } from './task-edit-modal';
@@ -127,6 +127,9 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   // Task delete confirmation state
   const [confirmTask, setConfirmTask] = useState<{ id: number; title: string } | null>(null);
 
+  // Bulk delete confirmation state
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
+
   // Undo toast state
   const [undoToast, setUndoToast] = useState<string | null>(null);
 
@@ -193,6 +196,18 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
     }
   };
 
+  // Confirmed bulk delete with allSettled feedback
+  const handleBulkDeleteConfirmed = async () => {
+    setConfirmBulkDelete(false);
+    const ids = [...selected];
+    const results = await Promise.allSettled(ids.map(id => deleteTask(id)));
+    const failed = results.filter(r => r.status === 'rejected').length;
+    const succeeded = results.length - failed;
+    clearSelection();
+    if (failed === 0) addToast(`${succeeded} task${succeeded !== 1 ? 's' : ''} deleted`, 'success');
+    else addToast(`${succeeded} deleted, ${failed} failed`, failed === results.length ? 'error' : 'success');
+  };
+
   // Filter tasks by search
   const filtered = search.trim()
     ? tasks.filter(
@@ -230,8 +245,17 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search tasks..."
-            className="w-full pl-9 pr-4 py-2 rounded-lg bg-background/80 border border-border text-sm outline-none focus:border-primary transition-colors"
+            className="w-full pl-9 pr-8 py-2 rounded-lg bg-background/80 border border-border text-sm outline-none focus:border-primary transition-colors"
           />
+          {search && (
+            <button
+              onClick={() => setSearch('')}
+              aria-label="Clear search"
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center gap-1.5 ml-auto">
@@ -318,7 +342,11 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
               onChange={async e => {
                 const status = e.target.value as TaskStatus;
                 if (!status) return;
-                await Promise.all([...selected].map(id => updateTask(id, { status })));
+                const results = await Promise.allSettled([...selected].map(id => updateTask(id, { status })));
+                const failed = results.filter(r => r.status === 'rejected').length;
+                const succeeded = results.length - failed;
+                if (failed === 0) addToast(`${succeeded} task${succeeded !== 1 ? 's' : ''} moved`, 'success');
+                else addToast(`${succeeded} moved, ${failed} failed`, failed === results.length ? 'error' : 'success');
                 clearSelection();
                 e.target.value = '';
               }}
@@ -336,7 +364,11 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
               onChange={async e => {
                 const priority = e.target.value as TaskPriority;
                 if (!priority) return;
-                await Promise.all([...selected].map(id => updateTask(id, { priority })));
+                const results = await Promise.allSettled([...selected].map(id => updateTask(id, { priority })));
+                const failed = results.filter(r => r.status === 'rejected').length;
+                const succeeded = results.length - failed;
+                if (failed === 0) addToast(`${succeeded} task${succeeded !== 1 ? 's' : ''} updated`, 'success');
+                else addToast(`${succeeded} updated, ${failed} failed`, failed === results.length ? 'error' : 'success');
                 clearSelection();
                 e.target.value = '';
               }}
@@ -350,11 +382,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
 
             {/* Bulk delete */}
             <button
-              onClick={async () => {
-                if (!confirm(`Delete ${selected.size} tasks?`)) return;
-                await Promise.all([...selected].map(id => deleteTask(id)));
-                clearSelection();
-              }}
+              onClick={() => setConfirmBulkDelete(true)}
               className="text-xs px-3 py-1.5 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 hover:bg-red-500/20 transition-colors"
             >
               Delete {selected.size}
@@ -392,6 +420,13 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           />
         ))}
       </div>
+
+      {/* Empty board state */}
+      {tasks.length === 0 && (
+        <div className="flex items-center justify-center py-10 text-muted-foreground/50 text-sm">
+          No tasks yet. Create one in any column above.
+        </div>
+      )}
 
       {editingTask && (
         <TaskEditModal
@@ -432,6 +467,16 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         message={`"${confirmTask?.title}" will be permanently deleted.`}
         onConfirm={handleDeleteConfirmed}
         onCancel={() => setConfirmTask(null)}
+      />
+
+      {/* Bulk delete confirmation dialog */}
+      <ConfirmDialog
+        open={confirmBulkDelete}
+        title={`Delete ${selected.size} task${selected.size !== 1 ? 's' : ''}?`}
+        message={`${selected.size} task${selected.size !== 1 ? 's' : ''} will be permanently deleted. This cannot be undone.`}
+        confirmLabel="Delete all"
+        onConfirm={handleBulkDeleteConfirmed}
+        onCancel={() => setConfirmBulkDelete(false)}
       />
 
       {/* Undo toast */}

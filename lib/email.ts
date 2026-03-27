@@ -4,7 +4,7 @@ export async function sendInviteEmail(to: string, boardName: string, inviteUrl: 
     console.log(`[invite] ${to} → ${inviteUrl}`);
     return;
   }
-  await fetch('https://api.resend.com/emails', {
+  const res = await fetch('https://api.resend.com/emails', {
     method: 'POST',
     headers: { 'Authorization': `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
@@ -14,4 +14,8 @@ export async function sendInviteEmail(to: string, boardName: string, inviteUrl: 
       html: `<p>You've been invited to collaborate on the board <strong>${boardName}</strong>.</p><p><a href="${inviteUrl}">Accept invitation</a></p>`,
     }),
   });
+  if (!res.ok) {
+    const body = await res.text().catch(() => '');
+    console.error(`[invite] Failed to send email to ${to}: ${res.status} ${body}`);
+  }
 }

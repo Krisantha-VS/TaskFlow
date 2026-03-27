@@ -9,6 +9,16 @@ import { ActivityFeed } from '@/components/activity-feed';
 
 const COLORS = ['blue','green','red','yellow','purple','pink','orange','gray'] as const;
 
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hrs = Math.floor(mins / 60);
+  if (hrs < 24) return `${hrs}h ago`;
+  return `${Math.floor(hrs / 24)}d ago`;
+}
+
 const COLOR_DOT: Record<string, string> = {
   blue:   'bg-blue-500',
   green:  'bg-green-500',
@@ -79,6 +89,7 @@ function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: 
           <button
             key={c}
             type="button"
+            aria-label={`Select ${c} color`}
             onClick={() => setColor(c)}
             className={`w-4 h-4 rounded-full ${COLOR_DOT[c]} ring-2 ring-offset-1 ring-offset-background transition-all ${color === c ? 'ring-white' : 'ring-transparent'}`}
           />
@@ -165,6 +176,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   const [recurrence, setRecurrence]   = useState<'daily' | 'weekly' | 'monthly' | null>(task.recurrence ?? null);
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null); // Fix K3
+  const [showAllActivity, setShowAllActivity] = useState(false);
 
   const firstInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
@@ -329,6 +341,9 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 onChange={e => setDueDate(e.target.value)}
                 className="w-full bg-background/50 border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary/60 transition-colors"
               />
+              {dueDate && new Date(dueDate) < new Date(new Date().toDateString()) && (
+                <p className="text-[10px] text-red-400 font-medium">Past due</p>
+              )}
             </div>
           </div>
 
@@ -389,6 +404,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                     </span>
                     <button
                       type="button"
+                      aria-label="Delete subtask"
                       onClick={() => onDeleteSubtask && onDeleteSubtask(s.id)}
                       className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all text-xs"
                     >
@@ -473,8 +489,17 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               Activity ({activity.length})
             </summary>
             <div className="mt-2 max-h-40 overflow-y-auto">
-              <ActivityFeed logs={activity} loading={activityLoading} />
+              <ActivityFeed logs={showAllActivity ? activity : activity.slice(0, 10)} loading={activityLoading} />
             </div>
+            {activity.length > 10 && !showAllActivity && (
+              <button
+                type="button"
+                onClick={() => setShowAllActivity(true)}
+                className="mt-1 mb-2 text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
+              >
+                Show more ({activity.length - 10} more)
+              </button>
+            )}
           </details>
         )}
 
@@ -496,7 +521,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                     <p className="text-xs text-foreground/90 break-words">{c.text}</p>
                     <div className="flex items-center gap-2 mt-1">
                       <span className="text-[10px] text-muted-foreground/60">
-                        {new Date(c.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
+                        {timeAgo(c.createdAt)}
                       </span>
                       {onDeleteComment && (
                         <button

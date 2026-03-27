@@ -20,6 +20,8 @@ export function MembersPanel({ token, boardId, onClose }: Props) {
   const [inviteLink, setInviteLink] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [inviteSuccess, setInviteSuccess] = useState<string | null>(null);
+  const [confirmRemoveEmail, setConfirmRemoveEmail] = useState<string | null>(null);
 
   useEffect(() => {
     taskApi.getBoardMembers(token, boardId)
@@ -36,15 +38,18 @@ export function MembersPanel({ token, boardId, onClose }: Props) {
       const result = await taskApi.inviteMember(token, boardId, email.trim(), role);
       setMembers(prev => [...prev.filter(m => m.inviteEmail !== result.inviteEmail), result]);
       setInviteLink(result.inviteUrl ?? null);
+      setInviteSuccess(`Invite sent to ${email.trim()}`);
       setEmail('');
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to invite');
+      setInviteSuccess(null);
     } finally {
       setInviting(false);
     }
   };
 
   const handleRemove = async (memberEmail: string) => {
+    setConfirmRemoveEmail(null);
     setMembers(prev => prev.filter(m => m.inviteEmail !== memberEmail));
     try { await taskApi.removeMember(token, boardId, memberEmail); } catch { /* ignore */ }
   };
@@ -99,6 +104,7 @@ export function MembersPanel({ token, boardId, onClose }: Props) {
               {inviting ? 'Sending…' : 'Send invite'}
             </button>
             {error && <p className="text-xs text-red-400">{error}</p>}
+            {inviteSuccess && <p className="text-xs text-green-400">{inviteSuccess}</p>}
             {inviteLink && (
               <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-muted/30 border border-border">
                 <p className="text-xs text-muted-foreground flex-1 truncate">{inviteLink}</p>
@@ -123,12 +129,31 @@ export function MembersPanel({ token, boardId, onClose }: Props) {
                       {m.role} · {m.acceptedAt ? '✓ Accepted' : 'Pending'}
                     </p>
                   </div>
-                  <button
-                    onClick={() => handleRemove(m.inviteEmail)}
-                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
+                  {confirmRemoveEmail === m.inviteEmail ? (
+                    <div className="flex items-center gap-1 text-xs shrink-0">
+                      <span className="text-muted-foreground">Remove?</span>
+                      <button
+                        onClick={() => handleRemove(m.inviteEmail)}
+                        className="text-destructive font-medium hover:text-destructive/80 transition-colors"
+                      >
+                        Yes
+                      </button>
+                      <span className="text-muted-foreground">·</span>
+                      <button
+                        onClick={() => setConfirmRemoveEmail(null)}
+                        className="text-muted-foreground hover:text-foreground transition-colors"
+                      >
+                        No
+                      </button>
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setConfirmRemoveEmail(m.inviteEmail)}
+                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
                 </div>
               ))}
             </div>

@@ -3,6 +3,8 @@ import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { pubsub } from '@/lib/pubsub';
 
+const IDLE_TIMEOUT_MS = 60_000; // Force-unsubscribe a controller idle for 60s with no successful enqueue
+
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   const boardId = parseInt(id);
@@ -14,22 +16,44 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   if (!board) return new Response('Not found', { status: 404 });
 
   let ctrl: ReadableStreamDefaultController;
+
+  // Idle timeout: if the controller goes 60s without a successful enqueue, force-remove it.
+  let idleTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  function resetIdleTimeout() {
+    if (idleTimeout) clearTimeout(idleTimeout);
+    idleTimeout = setTimeout(() => {
+      pubsub.unsubscribe(boardId, ctrl);
+      try { ctrl.close(); } catch { /* already closed */ }
+    }, IDLE_TIMEOUT_MS);
+  }
+
+  function clearIdleTimeout() {
+    if (idleTimeout) {
+      clearTimeout(idleTimeout);
+      idleTimeout = null;
+    }
+  }
+
   const stream = new ReadableStream({
     start(c) {
       ctrl = c;
       pubsub.subscribe(boardId, ctrl);
       // Send initial heartbeat
       ctrl.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+      resetIdleTimeout();
     },
     cancel() {
+      clearIdleTimeout();
       pubsub.unsubscribe(boardId, ctrl);
     },
   });
 
-  // Heartbeat every 25s to keep connection alive
+  // Heartbeat every 25s to keep connection alive; each successful heartbeat resets the idle timer
   const heartbeat = setInterval(() => {
     try {
       ctrl.enqueue(new TextEncoder().encode(': heartbeat\n\n'));
+      resetIdleTimeout();
     } catch {
       clearInterval(heartbeat);
     }
@@ -37,6 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
   req.signal.addEventListener('abort', () => {
     clearInterval(heartbeat);
+    clearIdleTimeout();
     pubsub.unsubscribe(boardId, ctrl);
   });
 
