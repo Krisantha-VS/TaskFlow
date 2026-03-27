@@ -1,7 +1,8 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, LogOut, Kanban, Menu, X } from 'lucide-react';
+import { Plus, Trash2, LogOut, Kanban, Menu, X, Sun, Moon, Monitor } from 'lucide-react';
+import { useTheme, type Theme } from '@/components/theme-provider';
 import { KanbanBoard } from './kanban-board';
 import { useBoards } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
@@ -331,6 +332,7 @@ export function TaskManagerApp() {
   const [addingBoard, setAddingBoard]     = useState(false);
   const [sidebarOpen, setSidebarOpen]     = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<{ boardId: number; boardName: string } | null>(null);
+  const { theme, setTheme } = useTheme();
 
   useEffect(() => {
     if (boards.length > 0 && !activeBoardId) setActiveBoardId(boards[0].id);
@@ -460,6 +462,25 @@ export function TaskManagerApp() {
               <p className="text-xs text-muted-foreground truncate leading-tight">{userEmail}</p>
             )}
           </div>
+        </div>
+        {/* Theme selector */}
+        <div className="flex items-center gap-1 px-2">
+          {([['light', Sun, 'Light'], ['system', Monitor, 'System'], ['dark', Moon, 'Dark']] as [Theme, React.ElementType, string][]).map(([t, Icon, label]) => (
+            <button
+              key={t}
+              onClick={() => setTheme(t)}
+              aria-label={`${label} mode`}
+              title={`${label} mode`}
+              className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg text-xs transition-colors ${
+                theme === t
+                  ? 'bg-primary/15 text-primary'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50'
+              }`}
+            >
+              <Icon className="w-3.5 h-3.5" />
+              <span className="hidden lg:inline">{label}</span>
+            </button>
+          ))}
         </div>
         <button
           onClick={logout}
