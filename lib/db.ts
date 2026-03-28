@@ -14,7 +14,7 @@ export function getDb(): PrismaClient {
     const adapter = new PrismaNeon({
       connectionString,
       max: 10,
-      connectionTimeoutMillis: 5000,
+      connectionTimeoutMillis: 20000,
     });
     _db = new PrismaClient({ adapter });
   }
