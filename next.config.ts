@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-const AUTH_UPSTREAM = process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1';
+const AUTH_UPSTREAM = process.env.AUTH_UPSTREAM_URL ?? process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1';
 
 const nextConfig: NextConfig = {
   async rewrites() {
