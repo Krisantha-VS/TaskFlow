@@ -177,7 +177,7 @@ function AuthGate({ login, register, loginDemo, loading, error, registrationSucc
       const res  = await fetch(`${AUTH_BASE}/auth/forgot-password`, {
         method:  'POST',
         headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ clientId: AUTH_CLIENT_ID, email: forgotEmail }),
+        body:    JSON.stringify({ clientId: AUTH_CLIENT_ID, email: forgotEmail, redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://task-flow.royalda.com'}` }),
       });
       const json = await res.json();
       if (!json.success) throw new Error(json.error ?? 'Request failed');
