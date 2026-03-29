@@ -3,18 +3,19 @@ import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { CommentCreateSchema } from '@/lib/validate';
+import { sendCommentEmail } from '@/lib/email';
 
-async function getUser(req: NextRequest): Promise<string> {
+async function getUser(req: NextRequest): Promise<{ sub: string; name?: string; email?: string }> {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
   if (!payload?.sub) throw new AuthError('Invalid token');
-  return payload.sub;
+  return payload;
 }
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const userId = await getUser(req);
+    const user = await getUser(req);
     const taskId = parseInt((await params).id);
-    const task = await db.task.findFirst({ where: { id: taskId, userId } });
+    const task = await db.task.findFirst({ where: { id: taskId, userId: user.sub } });
     if (!task) return fail('Task not found', 404);
     const comments = await db.comment.findMany({
       where: { taskId },
@@ -26,12 +27,23 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const userId = await getUser(req);
+    const user = await getUser(req);
     const taskId = parseInt((await params).id);
-    const task = await db.task.findFirst({ where: { id: taskId, userId } });
+    const task = await db.task.findFirst({ where: { id: taskId, userId: user.sub } });
     if (!task) return fail('Task not found', 404);
     const body = CommentCreateSchema.parse(await req.json());
-    const comment = await db.comment.create({ data: { taskId, userId, text: body.text } });
+    const comment = await db.comment.create({ data: { taskId, userId: user.sub, text: body.text } });
+
+    // Non-blocking email: notify assignee when someone else comments
+    if (task.assigneeEmail && task.assigneeEmail !== user.email) {
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taskflow-gamma-liard.vercel.app';
+      const taskUrl = `${appUrl}/boards/${task.boardId}`;
+      const commenterName = user.name ?? user.email ?? 'A teammate';
+      sendCommentEmail(task.assigneeEmail, task.title, commenterName, body.text, taskUrl).catch(
+        (err) => console.error('[email] sendCommentEmail failed:', err),
+      );
+    }
+
     return ok(comment, 201);
   } catch (e) { return handleError(e); }
 }

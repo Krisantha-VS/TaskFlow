@@ -33,6 +33,7 @@ model Task {
   dueDate        DateTime?
   recurrence     String?            @db.VarChar(20)
   nextOccurrence DateTime?
+  assigneeEmail  String?
   createdAt      DateTime           @default(now())
   updatedAt      DateTime           @updatedAt
   board          Board              @relation(fields: [boardId], references: [id], onDelete: Cascade)

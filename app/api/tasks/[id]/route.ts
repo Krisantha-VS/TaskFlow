@@ -5,6 +5,7 @@ import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { TaskUpdateSchema } from '@/lib/validate';
 import { logActivity } from '@/lib/activity';
+import { sendTaskAssignedEmail } from '@/lib/email';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -25,13 +26,17 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (!task) return fail('Task not found', 404);
 
     const update: Record<string, unknown> = {};
-    if (body.title !== undefined)       update.title       = body.title;
-    if (body.description !== undefined) update.description = body.description ?? null;
-    if (body.status !== undefined)      update.status      = body.status;
-    if (body.priority !== undefined)    update.priority    = body.priority;
-    if (body.position !== undefined)    update.position    = body.position;
-    if ('due_date' in body)             update.dueDate     = body.due_date ? new Date(body.due_date) : null;
-    if (body.recurrence !== undefined)  update.recurrence  = body.recurrence ?? null;
+    if (body.title !== undefined)         update.title         = body.title;
+    if (body.description !== undefined)   update.description   = body.description ?? null;
+    if (body.status !== undefined)        update.status        = body.status;
+    if (body.priority !== undefined)      update.priority      = body.priority;
+    if (body.position !== undefined)      update.position      = body.position;
+    if ('due_date' in body)               update.dueDate       = body.due_date ? new Date(body.due_date) : null;
+    if (body.recurrence !== undefined)    update.recurrence    = body.recurrence ?? null;
+    if ('assigneeEmail' in body)          update.assigneeEmail = body.assigneeEmail ?? null;
+
+    const newAssigneeEmail = 'assigneeEmail' in body ? (body.assigneeEmail ?? null) : undefined;
+    const assigneeChanged  = newAssigneeEmail !== undefined && newAssigneeEmail !== task.assigneeEmail;
 
     const changes = Object.keys(update).join(', ');
 
@@ -70,6 +75,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     const updated = await db.task.findFirst({ where: { id, userId } });
     logActivity({ boardId: task.boardId, userId, action: 'updated', taskId: id, detail: changes });
+
+    // Non-blocking email: notify new assignee when assigneeEmail is set or changed
+    if (assigneeChanged && newAssigneeEmail) {
+      const board = await db.board.findFirst({ where: { id: task.boardId } });
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://taskflow-gamma-liard.vercel.app';
+      const taskUrl = `${appUrl}/boards/${task.boardId}`;
+      sendTaskAssignedEmail(newAssigneeEmail, task.title, board?.name ?? 'TaskFlow', taskUrl).catch(
+        (err) => console.error('[email] sendTaskAssignedEmail failed:', err),
+      );
+    }
 
     return ok(updated);
   } catch (e) {

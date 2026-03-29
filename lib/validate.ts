@@ -30,6 +30,7 @@ export const TaskUpdateSchema = z.object({
   position: z.number().int().min(0).optional(),
   due_date: z.string().datetime({ offset: true }).optional().nullable(),
   recurrence: z.enum(RECURRENCE).optional().nullable(),
+  assigneeEmail: z.string().email().optional().nullable(),
 });
 
 export const LabelCreateSchema = z.object({
