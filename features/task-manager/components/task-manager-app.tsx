@@ -43,22 +43,34 @@ function useInlineAuth() {
   const [token, setToken]                       = useState<string | null>(null);
   const [loading, setLoading]                   = useState(false);
   const [error, setError]                       = useState('');
-  // Fix M4: registration success state
   const [registrationSuccess, setRegistrationSuccess] = useState(false);
+  // true while a silent refresh is in-flight on mount — prevents dashboard flash
+  const [refreshing, setRefreshing]             = useState(true);
 
-  // Fix A7: on mount — restore from sessionStorage, or try refresh if only refresh token exists
   useEffect(() => {
     const stored = getAccessToken();
+
     if (stored) {
-      setToken(stored);
-      return;
+      // Check client-side expiry before rendering the dashboard
+      try {
+        const payload = JSON.parse(atob(stored.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+        const exp = payload?.exp ? Number(payload.exp) * 1000 : 0;
+        if (exp > Date.now()) {
+          setToken(stored);
+          setRefreshing(false);
+          return;
+        }
+      } catch { /* malformed token — fall through to refresh */ }
     }
-    // Fix A7: no access token in session, but refresh token exists — try silent refresh
+
+    // No valid token — try silent refresh
     const refresh = getRefreshToken();
     if (refresh) {
       refreshAccessToken().then(newToken => {
         if (newToken) setToken(newToken);
-      });
+      }).finally(() => setRefreshing(false));
+    } else {
+      setRefreshing(false);
     }
   }, []);
 
@@ -137,7 +149,7 @@ function useInlineAuth() {
     } finally { setLoading(false); }
   };
 
-  return { token, loading, error, registrationSuccess, login, register, logout, loginDemo };
+  return { token, loading, error, registrationSuccess, refreshing, login, register, logout, loginDemo };
 }
 
 // ─── Auth Gate ────────────────────────────────────────────
@@ -325,7 +337,7 @@ function AuthGate({ login, register, loginDemo, loading, error, registrationSucc
 
 export function TaskManagerApp() {
   // Fix A1/A2: single useInlineAuth instance at the top level
-  const { token, loading: authLoading, error: authError, registrationSuccess, login, register, logout, loginDemo } = useInlineAuth();
+  const { token, loading: authLoading, error: authError, registrationSuccess, refreshing, login, register, logout, loginDemo } = useInlineAuth();
   const { boards, loading: boardsLoading, error: boardsError, createBoard, deleteBoard, updateBoardColumns } = useBoards(token);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
   const [newBoardName, setNewBoardName]   = useState('');
@@ -350,7 +362,15 @@ export function TaskManagerApp() {
   const userName  = profile?.name  ?? profile?.email?.split('@')[0] ?? 'User';
   const userEmail = profile?.email ?? '';
 
-  // Fix A1/A2: render AuthGate with props from the single hook instance
+  // Show neutral spinner while silent refresh is in-flight — no dashboard or login flash
+  if (refreshing) {
+    return (
+      <div className="min-h-[calc(100vh-3rem)] flex items-center justify-center">
+        <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
   if (!token) {
     return (
       <AuthGate

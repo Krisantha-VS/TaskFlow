@@ -24,8 +24,12 @@ export function clearTokens() {
 }
 
 // ─── Refresh ──────────────────────────────────────────────
+// Singleton: all concurrent callers share one refresh attempt.
+// Prevents race condition with single-use token rotation.
 
-export async function refreshAccessToken(): Promise<string | null> {
+let _refreshing: Promise<string | null> | null = null;
+
+async function doRefresh(): Promise<string | null> {
   const refreshToken = getRefreshToken();
   if (!refreshToken) return null;
 
@@ -33,20 +37,18 @@ export async function refreshAccessToken(): Promise<string | null> {
     const res  = await fetch(`${AUTH_BASE}/auth/refresh`, {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
-      // Fix A4: include clientId in refresh body
       body:    JSON.stringify({ refreshToken, clientId: AUTH_CLIENT_ID }),
     });
     const json = await res.json();
 
     if (!res.ok || !json.success) {
-      // Fix A3: dispatch auth:expired before clearing tokens
       window.dispatchEvent(new Event('auth:expired'));
       clearTokens();
       return null;
     }
 
     if (!json.data?.accessToken || !json.data?.refreshToken) {
-      throw new Error('Auth error: token refresh response missing accessToken or refreshToken');
+      throw new Error('Refresh response missing tokens');
     }
     const { accessToken, refreshToken: newRefresh } = json.data;
     storeTokens(accessToken, newRefresh ?? refreshToken);
@@ -56,6 +58,12 @@ export async function refreshAccessToken(): Promise<string | null> {
     clearTokens();
     return null;
   }
+}
+
+export async function refreshAccessToken(): Promise<string | null> {
+  if (_refreshing) return _refreshing;
+  _refreshing = doRefresh().finally(() => { _refreshing = null; });
+  return _refreshing;
 }
 
 // ─── authFetch ────────────────────────────────────────────
