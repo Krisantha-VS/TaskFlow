@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const willSpawn = body.status === 'done' && task.recurrence;
 
     if (willSpawn) {
-      // Wrap update + new occurrence creation in a single transaction
+      // HTTP adapter doesn't support $transaction — run sequentially
       const base = task.dueDate ? new Date(task.dueDate) : new Date();
       const y = base.getFullYear(), mo = base.getMonth(), d = base.getDate();
       let next: Date;
@@ -52,22 +52,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       else if (task.recurrence === 'weekly') next = new Date(y, mo, d + 7);
       else /* monthly */                     next = new Date(y, mo + 1, d);
 
-      await db.$transaction([
-        db.task.updateMany({ where: { id, userId }, data: update }),
-        db.task.create({
-          data: {
-            boardId:     task.boardId,
-            userId:      task.userId,
-            title:       task.title,
-            description: task.description,
-            priority:    task.priority,
-            status:      'todo',
-            position:    0,
-            recurrence:  task.recurrence,
-            dueDate:     next,
-          },
-        }),
-      ]);
+      await db.task.updateMany({ where: { id, userId }, data: update });
+      await db.task.create({
+        data: {
+          boardId:     task.boardId,
+          userId:      task.userId,
+          title:       task.title,
+          description: task.description,
+          priority:    task.priority,
+          status:      'todo',
+          position:    0,
+          recurrence:  task.recurrence,
+          dueDate:     next,
+        },
+      });
     } else {
       // FIX: use updateMany with userId in where to prevent TOCTOU
       await db.task.updateMany({ where: { id, userId }, data: update });
