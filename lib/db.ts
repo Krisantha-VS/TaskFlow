@@ -4,11 +4,9 @@ import { PrismaNeonHttp } from '@prisma/adapter-neon';
 const globalForPrisma = globalThis as unknown as { prisma?: PrismaClient };
 
 function sanitizeUrl(url: string): string {
-  // channel_binding is libpq-only — HTTP driver rejects it
-  // Pooler endpoint doesn't support HTTP queries — strip -pooler suffix
+  // channel_binding is libpq-only — Neon HTTP driver rejects it
   const u = new URL(url);
   u.searchParams.delete('channel_binding');
-  u.hostname = u.hostname.replace('-pooler', '');
   return u.toString();
 }
 
