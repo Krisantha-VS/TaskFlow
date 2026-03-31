@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import type { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
@@ -52,7 +53,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       else if (task.recurrence === 'weekly') next = new Date(y, mo, d + 7);
       else /* monthly */                     next = new Date(y, mo + 1, d);
 
-      await db.task.updateMany({ where: { id, userId }, data: update });
+      await db.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
       await db.task.create({
         data: {
           boardId:     task.boardId,
@@ -67,8 +68,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         },
       });
     } else {
-      // FIX: use updateMany with userId in where to prevent TOCTOU
-      await db.task.updateMany({ where: { id, userId }, data: update });
+      await db.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
     }
 
     const updated = await db.task.findFirst({ where: { id, userId } });
@@ -86,8 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return ok(updated);
   } catch (e) {
-    const detail = JSON.stringify(e, Object.getOwnPropertyNames(e as object));
-    return fail(`[debug] ${detail}`, 500);
+    return handleError(e);
   }
 }
 
