@@ -86,6 +86,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     return ok(updated);
   } catch (e) {
+    console.error('[tasks/patch]', JSON.stringify(e, Object.getOwnPropertyNames(e as object)));
     return handleError(e);
   }
 }
