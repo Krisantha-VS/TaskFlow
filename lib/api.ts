@@ -9,11 +9,14 @@ export function fail(error: string, status = 400) {
   return NextResponse.json({ success: false, error }, { status });
 }
 
+const AUTH_ERRORS = ['Missing token', 'Token expired', 'Invalid token'];
+
 export function handleError(e: unknown) {
   if (e instanceof ZodError) {
     return fail(e.issues.map((x: { message: string }) => x.message).join(', '), 400);
   }
   if (e instanceof AuthError) return fail('Unauthorized', 401);
+  if (e instanceof Error && AUTH_ERRORS.includes(e.message)) return fail('Unauthorized', 401);
   console.error('[taskflow]', e);
   return fail('Internal server error', 500);
 }
