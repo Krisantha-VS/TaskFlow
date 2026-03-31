@@ -9,7 +9,12 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id } = await params;
   const boardId = parseInt(id);
 
-  const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
+  let payload: { sub: string } | null = null;
+  try {
+    payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
+  } catch {
+    return new Response('Unauthorized', { status: 401 });
+  }
   if (!payload?.sub) return new Response('Unauthorized', { status: 401 });
 
   const board = await db.board.findFirst({ where: { id: boardId, userId: payload.sub } });
