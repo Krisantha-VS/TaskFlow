@@ -6,7 +6,7 @@ export async function GET() {
     await db.$queryRaw`SELECT 1`;
     return NextResponse.json({ status: 'ok', db: 'connected', timestamp: new Date().toISOString() });
   } catch (e) {
-    const msg = e instanceof Error ? e.message : String(e);
-    return NextResponse.json({ status: 'error', db: 'disconnected', reason: msg }, { status: 503 });
+    const reason = JSON.stringify(e, Object.getOwnPropertyNames(e as object));
+    return NextResponse.json({ status: 'error', db: 'disconnected', reason }, { status: 503 });
   }
 }
