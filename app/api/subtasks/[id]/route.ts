@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { SubtaskUpdateSchema } from '@/lib/validate';
 
 async function getUser(req: NextRequest) {
@@ -23,6 +24,7 @@ async function getSubtask(id: number, userId: string) {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const id = parseInt((await params).id);
     if (!id || id < 1) return fail('Invalid subtask id', 400);
     const subtask = await getSubtask(id, userId);
@@ -36,6 +38,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const id = parseInt((await params).id);
     if (!id || id < 1) return fail('Invalid subtask id', 400);
     const subtask = await getSubtask(id, userId);

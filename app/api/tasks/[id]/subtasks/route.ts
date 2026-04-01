@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { SubtaskCreateSchema } from '@/lib/validate';
 
 async function getUser(req: NextRequest) {
@@ -13,6 +14,7 @@ async function getUser(req: NextRequest) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const taskId = parseInt((await params).id);
     const task = await db.task.findFirst({ where: { id: taskId, userId } });
     if (!task) return fail('Task not found', 404);
@@ -27,13 +29,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const taskId = parseInt((await params).id);
     const task = await db.task.findFirst({ where: { id: taskId, userId } });
     if (!task) return fail('Task not found', 404);
     const body = SubtaskCreateSchema.parse(await req.json());
-    const count = await db.subtask.count({ where: { taskId } });
-    const subtask = await db.subtask.create({
-      data: { taskId, title: body.title, position: count },
+    const subtask = await db.$transaction(async (tx) => {
+      const count = await tx.subtask.count({ where: { taskId } });
+      return tx.subtask.create({ data: { taskId, title: body.title, position: count } });
     });
     return ok(subtask, 201);
   } catch (e) { return handleError(e); }

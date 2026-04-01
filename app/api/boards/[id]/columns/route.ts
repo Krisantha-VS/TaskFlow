@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { BoardColumnsSchema } from '@/lib/validate';
 
 async function getUser(req: NextRequest) {
@@ -13,6 +14,7 @@ async function getUser(req: NextRequest) {
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const id = parseInt((await params).id);
     const board = await db.board.findFirst({ where: { id, userId } });
     if (!board) return fail('Board not found', 404);

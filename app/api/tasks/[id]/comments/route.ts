@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { CommentCreateSchema } from '@/lib/validate';
 import { sendCommentEmail } from '@/lib/email';
 
@@ -14,6 +15,7 @@ async function getUser(req: NextRequest): Promise<{ sub: string; name?: string; 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getUser(req);
+    if (!checkRateLimit(user.sub)) return fail('Too many requests', 429);
     const taskId = parseInt((await params).id);
     const task = await db.task.findFirst({ where: { id: taskId, userId: user.sub } });
     if (!task) return fail('Task not found', 404);
@@ -28,6 +30,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const user = await getUser(req);
+    if (!checkRateLimit(user.sub)) return fail('Too many requests', 429);
     const taskId = parseInt((await params).id);
     const task = await db.task.findFirst({ where: { id: taskId, userId: user.sub } });
     if (!task) return fail('Task not found', 404);

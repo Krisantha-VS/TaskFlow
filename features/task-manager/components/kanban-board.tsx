@@ -14,6 +14,11 @@ import { MembersPanel } from './members-panel';
 
 type SortKey = 'default' | 'priority' | 'due_date' | 'created';
 
+const VALID_TASK_STATUSES = new Set<string>(['todo', 'in_progress', 'done']);
+function isTaskStatus(value: string): value is TaskStatus {
+  return VALID_TASK_STATUSES.has(value);
+}
+
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
 
 function sortTasks(tasks: Task[], key: SortKey): Task[] {
@@ -122,6 +127,11 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         headers: { Authorization: `Bearer ${token}` },
       });
       if (!res.ok) { addToast('Export failed', 'error'); return; }
+      const contentType = res.headers.get('content-type') ?? '';
+      if (!contentType.includes('text/csv') && !contentType.includes('text/calendar')) {
+        addToast('Export returned unexpected format', 'error');
+        return;
+      }
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -168,12 +178,9 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
     if (!draggingTask || draggingTask.status === status) return;
     const moving = draggingTask;
     setDraggingTask(null);
-    try {
-      await moveTask(moving.id, status);
-      // no success toast for move — it's visually self-evident
-    } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Failed to move task', 'error');
-    }
+    const { error } = await moveTask(moving.id, status);
+    if (error) addToast(error, 'error');
+    // no success toast for move — it's visually self-evident
   };
 
   // Fix K5: wrapped createTask with feedback
@@ -398,7 +405,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
                 const status = e.target.value as TaskStatus;
                 if (!status) return;
                 const results = await Promise.allSettled([...selected].map(id => updateTask(id, { status })));
-                const failed = results.filter(r => r.status === 'rejected').length;
+                const failed = results.filter(r => r.status === 'fulfilled' && (r.value as any)?.error).length;
                 const succeeded = results.length - failed;
                 if (failed === 0) addToast(`${succeeded} task${succeeded !== 1 ? 's' : ''} moved`, 'success');
                 else addToast(`${succeeded} moved, ${failed} failed`, failed === results.length ? 'error' : 'success');
@@ -421,7 +428,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
                 const priority = e.target.value as TaskPriority;
                 if (!priority) return;
                 const results = await Promise.allSettled([...selected].map(id => updateTask(id, { priority })));
-                const failed = results.filter(r => r.status === 'rejected').length;
+                const failed = results.filter(r => r.status === 'fulfilled' && (r.value as any)?.error).length;
                 const succeeded = results.length - failed;
                 if (failed === 0) addToast(`${succeeded} task${succeeded !== 1 ? 's' : ''} updated`, 'success');
                 else addToast(`${succeeded} updated, ${failed} failed`, failed === results.length ? 'error' : 'success');
@@ -455,7 +462,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         {columns.map(col => (
           <KanbanColumn
             key={col.key}
-            status={col.key as TaskStatus}
+            status={isTaskStatus(col.key) ? col.key : 'todo'}
             label={col.label}
             colorClass={col.color ?? ''}
             tasks={sortTasks(labelFiltered.filter(t => t.status === col.key), sortKey)}

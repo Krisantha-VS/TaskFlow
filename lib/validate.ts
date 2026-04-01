@@ -34,6 +34,7 @@ export const TaskUpdateSchema = z.object({
 });
 
 export const LabelCreateSchema = z.object({
+  board_id: z.number().int().positive(),
   name:  z.string().min(1).max(50).trim(),
   color: z.enum(['blue','green','red','yellow','purple','pink','orange','gray']).default('blue'),
 });

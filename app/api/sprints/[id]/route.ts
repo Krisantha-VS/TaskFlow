@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod/v4';
 
 async function getUser(req: NextRequest) {
@@ -13,12 +14,13 @@ async function getUser(req: NextRequest) {
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { id } = await params;
     const sprintId = parseInt(id);
     const body = z.object({
       name: z.string().min(1).max(100).optional(),
-      start_date: z.string().nullable().optional(),
-      end_date: z.string().nullable().optional(),
+      start_date: z.string().datetime({ offset: true }).optional().nullable(),
+      end_date: z.string().datetime({ offset: true }).optional().nullable(),
     }).parse(await req.json());
 
     const sprint = await db.sprint.findFirst({ where: { id: sprintId }, include: { board: true } });
@@ -39,6 +41,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { id } = await params;
     const sprintId = parseInt(id);
     const sprint = await db.sprint.findFirst({ where: { id: sprintId }, include: { board: true } });

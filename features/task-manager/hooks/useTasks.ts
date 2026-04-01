@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { taskApi } from '../api';
 import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn, Sprint } from '../types';
 
@@ -44,53 +44,66 @@ export function useTasks(token: string | null, boardId: number | null) {
 
     const controller = new AbortController();
 
-    (async () => {
+    const setupStream = async () => {
       try {
         const res = await fetch(`/api/boards/${boardId}/stream`, {
           headers: { Authorization: `Bearer ${token}` },
           signal: controller.signal,
         });
-        if (!res.ok || !res.body) return;
+        if (!res.ok || !res.body) {
+          setTimeout(() => setupStream(), 5000); // retry after 5s
+          return;
+        }
         const reader = res.body.getReader();
         const decoder = new TextDecoder();
         let buf = '';
-        while (true) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          buf += decoder.decode(value, { stream: true });
-          const lines = buf.split('\n\n');
-          buf = lines.pop() ?? '';
-          for (const chunk of lines) {
-            const dataLine = chunk.split('\n').find(l => l.startsWith('data: '));
-            if (!dataLine) continue;
-            try {
-              const event = JSON.parse(dataLine.slice(6));
-              const { type, data } = event;
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            buf += decoder.decode(value, { stream: true });
+            const lines = buf.split('\n\n');
+            buf = lines.pop() ?? '';
+            for (const chunk of lines) {
+              const dataLine = chunk.split('\n').find(l => l.startsWith('data: '));
+              if (!dataLine) continue;
+              try {
+                const event = JSON.parse(dataLine.slice(6));
+                const { type, data } = event;
 
-              if (type === 'task_created' && data?.task) {
-                // Append new task only if not already present (guard against own mutation echo)
-                setTasks(prev => prev.some(t => t.id === data.task.id) ? prev : [...prev, data.task]);
-              } else if (type === 'task_updated' && data?.task) {
-                // Replace the existing task by id; if not found, fall back to full refetch
-                setTasks(prev => {
-                  const idx = prev.findIndex(t => t.id === data.task.id);
-                  if (idx === -1) { load(); return prev; }
-                  return prev.map(t => t.id === data.task.id ? data.task : t);
-                });
-              } else if (type === 'task_moved' && data?.task) {
-                // Update status/column fields in state
-                setTasks(prev => prev.map(t => t.id === data.task.id ? data.task : t));
-              } else if (type === 'task_deleted' && data?.taskId) {
-                setTasks(prev => prev.filter(t => t.id !== data.taskId));
-              } else {
-                // Unknown event type or missing task payload — full refetch as safety net
-                load();
-              }
-            } catch { /* ignore parse errors */ }
+                if (type === 'task_created' && data?.task) {
+                  // Append new task only if not already present (guard against own mutation echo)
+                  setTasks(prev => prev.some(t => t.id === data.task.id) ? prev : [...prev, data.task]);
+                } else if (type === 'task_updated' && data?.task) {
+                  // Replace the existing task by id; if not found, fall back to full refetch
+                  setTasks(prev => {
+                    const idx = prev.findIndex(t => t.id === data.task.id);
+                    if (idx === -1) { load(); return prev; }
+                    return prev.map(t => t.id === data.task.id ? data.task : t);
+                  });
+                } else if (type === 'task_moved' && data?.task) {
+                  // Update status/column fields in state
+                  setTasks(prev => prev.map(t => t.id === data.task.id ? data.task : t));
+                } else if (type === 'task_deleted' && data?.taskId) {
+                  setTasks(prev => prev.filter(t => t.id !== data.taskId));
+                } else {
+                  // Unknown event type or missing task payload — full refetch as safety net
+                  load();
+                }
+              } catch { /* ignore parse errors */ }
+            }
           }
+        } catch {
+          // Stream read error — retry after 5s
+          if (!controller.signal.aborted) setTimeout(() => setupStream(), 5000);
         }
-      } catch { /* connection closed or aborted */ }
-    })();
+      } catch {
+        // connection closed or aborted
+        if (!controller.signal.aborted) setTimeout(() => setupStream(), 5000);
+      }
+    };
+
+    setupStream();
 
     return () => controller.abort();
   }, [token, boardId, load]);
@@ -175,10 +188,11 @@ export function useTasks(token: string | null, boardId: number | null) {
     }
   };
 
-  const addTaskLabel = async (taskId: number, labelId: number): Promise<void> => {
-    if (!token) return;
-    await taskApi.addTaskLabel(token, taskId, labelId);
-    // Update local task labels state
+  const addTaskLabel = async (taskId: number, labelId: number): Promise<{ error: string | null }> => {
+    if (!token) return { error: 'Not authenticated' };
+    setMutationError(null);
+    const prevTasks = tasks;
+    // Optimistic update
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
       const label = labels.find(l => l.id === labelId);
@@ -187,15 +201,35 @@ export function useTasks(token: string | null, boardId: number | null) {
       if (existing.find(l => l.id === labelId)) return t;
       return { ...t, labels: [...existing, label] };
     }));
+    try {
+      await taskApi.addTaskLabel(token, taskId, labelId);
+      return { error: null };
+    } catch (e) {
+      setTasks(prevTasks);
+      const msg = e instanceof Error ? e.message : 'Failed to add label';
+      setMutationError(msg);
+      return { error: msg };
+    }
   };
 
-  const removeTaskLabel = async (taskId: number, labelId: number): Promise<void> => {
-    if (!token) return;
-    await taskApi.removeTaskLabel(token, taskId, labelId);
+  const removeTaskLabel = async (taskId: number, labelId: number): Promise<{ error: string | null }> => {
+    if (!token) return { error: 'Not authenticated' };
+    setMutationError(null);
+    const prevTasks = tasks;
+    // Optimistic update
     setTasks(prev => prev.map(t => {
       if (t.id !== taskId) return t;
       return { ...t, labels: (t.labels ?? []).filter(l => l.id !== labelId) };
     }));
+    try {
+      await taskApi.removeTaskLabel(token, taskId, labelId);
+      return { error: null };
+    } catch (e) {
+      setTasks(prevTasks);
+      const msg = e instanceof Error ? e.message : 'Failed to remove label';
+      setMutationError(msg);
+      return { error: msg };
+    }
   };
 
   const addDependency = useCallback(async (taskId: number, blockerId: number) => {
@@ -204,7 +238,10 @@ export function useTasks(token: string | null, boardId: number | null) {
       await taskApi.addDependency(token, taskId, blockerId);
       // Reload to get fresh blockedBy array
       await load();
-    } catch { /* ignore */ }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to add dependency';
+      setMutationError(msg);
+    }
   }, [token, load]);
 
   const removeDependency = useCallback(async (taskId: number, blockerId: number) => {
@@ -250,12 +287,17 @@ export function useTasks(token: string | null, boardId: number | null) {
     } catch { /* non-critical */ }
   }, [token]);
 
-  const createSubtask = useCallback(async (taskId: number, title: string) => {
-    if (!token) return;
+  const createSubtask = useCallback(async (taskId: number, title: string): Promise<{ error: string | null }> => {
+    if (!token) return { error: 'Not authenticated' };
     try {
       const subtask = await taskApi.createSubtask(token, taskId, title);
       setSubtasks(prev => ({ ...prev, [taskId]: [...(prev[taskId] ?? []), subtask] }));
-    } catch { /* ignore */ }
+      return { error: null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to create subtask';
+      setMutationError(msg);
+      return { error: msg };
+    }
   }, [token]);
 
   const toggleSubtask = useCallback(async (taskId: number, subtaskId: number, completed: boolean) => {
@@ -276,13 +318,20 @@ export function useTasks(token: string | null, boardId: number | null) {
     }
   }, [token]);
 
-  const deleteSubtask = useCallback(async (taskId: number, subtaskId: number) => {
-    if (!token) return;
+  const deleteSubtask = useCallback(async (taskId: number, subtaskId: number): Promise<{ error: string | null }> => {
+    if (!token) return { error: 'Not authenticated' };
+    const prevSubtasks = subtasks[taskId];
     setSubtasks(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(s => s.id !== subtaskId) }));
     try {
       await taskApi.deleteSubtask(token, subtaskId);
-    } catch { /* ignore */ }
-  }, [token]);
+      return { error: null };
+    } catch (e) {
+      if (prevSubtasks !== undefined) setSubtasks(prev => ({ ...prev, [taskId]: prevSubtasks }));
+      const msg = e instanceof Error ? e.message : 'Failed to delete subtask';
+      setMutationError(msg);
+      return { error: msg };
+    }
+  }, [token, subtasks]);
 
   const [comments, setComments] = useState<Record<number, Comment[]>>({});
 
@@ -294,30 +343,49 @@ export function useTasks(token: string | null, boardId: number | null) {
     } catch { /* non-critical */ }
   }, [token]);
 
+  // Ref to track which taskId is currently being fetched (deduplication)
+  const fetchingModalTaskId = useRef<number | null>(null);
+
   // Parallel fetch for task modal — replaces sequential fetchActivity/fetchSubtasks/fetchComments calls
+  // Deduplicates concurrent fetches for the same taskId; individual failures don't block others
   const fetchModalData = useCallback(async (taskId: number) => {
-    await Promise.all([
+    if (fetchingModalTaskId.current === taskId) return;
+    fetchingModalTaskId.current = taskId;
+    await Promise.allSettled([
       fetchActivity(taskId),
       fetchSubtasks(taskId),
       fetchComments(taskId),
     ]);
+    if (fetchingModalTaskId.current === taskId) fetchingModalTaskId.current = null;
   }, [fetchActivity, fetchSubtasks, fetchComments]);
 
-  const addComment = useCallback(async (taskId: number, text: string) => {
-    if (!token) return;
+  const addComment = useCallback(async (taskId: number, text: string): Promise<{ error: string | null }> => {
+    if (!token) return { error: 'Not authenticated' };
     try {
       const comment = await taskApi.createComment(token, taskId, text);
       setComments(prev => ({ ...prev, [taskId]: [...(prev[taskId] ?? []), comment] }));
-    } catch { /* ignore */ }
+      return { error: null };
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Failed to add comment';
+      setMutationError(msg);
+      return { error: msg };
+    }
   }, [token]);
 
-  const deleteComment = useCallback(async (taskId: number, commentId: number) => {
-    if (!token) return;
+  const deleteComment = useCallback(async (taskId: number, commentId: number): Promise<{ error: string | null }> => {
+    if (!token) return { error: 'Not authenticated' };
+    const prevComments = comments[taskId];
     setComments(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(c => c.id !== commentId) }));
     try {
       await taskApi.deleteComment(token, commentId);
-    } catch { /* ignore */ }
-  }, [token]);
+      return { error: null };
+    } catch (e) {
+      if (prevComments !== undefined) setComments(prev => ({ ...prev, [taskId]: prevComments }));
+      const msg = e instanceof Error ? e.message : 'Failed to delete comment';
+      setMutationError(msg);
+      return { error: msg };
+    }
+  }, [token, comments]);
 
   const fetchSprints = useCallback(async () => {
     if (!token || !boardId) return;
@@ -349,7 +417,13 @@ export function useTasks(token: string | null, boardId: number | null) {
   const setTaskSprint = useCallback(async (taskId: number, sprintId: number | null) => {
     if (!token) return;
     setTasks(prev => prev.map(t => t.id === taskId ? { ...t, sprintId } : t));
-    try { await taskApi.updateTask(token, taskId, { sprintId } as never); } catch { await load(); }
+    try {
+      await taskApi.updateTask(token, taskId, { sprintId } as never);
+    } catch (e) {
+      await load();
+      const msg = e instanceof Error ? e.message : 'Failed to update sprint';
+      setMutationError(msg);
+    }
   }, [token, load]);
 
   return { tasks, labels, loading, error, mutationError, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, fetchLabels, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, fetchModalData, addComment, deleteComment, sprints, fetchSprints, createSprint, deleteSprint, setTaskSprint, reload: load };

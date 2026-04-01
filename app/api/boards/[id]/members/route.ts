@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod/v4';
 import { sendInviteEmail } from '@/lib/email';
 import { randomBytes } from 'crypto';
@@ -16,6 +17,7 @@ async function getUser(req: NextRequest) {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { id } = await params;
     const boardId = parseInt(id);
     const board = await db.board.findFirst({ where: { id: boardId, userId } });
@@ -29,6 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { id } = await params;
     const boardId = parseInt(id);
     const body = z.object({
@@ -57,6 +60,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { id } = await params;
     const boardId = parseInt(id);
     const body = z.object({ email: z.string().email() }).parse(await req.json());

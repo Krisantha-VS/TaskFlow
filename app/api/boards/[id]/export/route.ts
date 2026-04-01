@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { fail, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -20,6 +21,7 @@ function escapeCSV(value: string | null | undefined): string {
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const id = parseInt((await params).id);
     if (!id || id < 1) return fail('Invalid board id', 400);
 

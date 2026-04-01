@@ -26,6 +26,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const task = await db.task.findFirst({ where: { id, userId } });
     if (!task) return fail('Task not found', 404);
 
+    const action = (body.status && body.status !== task.status) ? 'moved' : 'updated';
+
     const update: Record<string, unknown> = {};
     if (body.title !== undefined)         update.title         = body.title;
     if (body.description !== undefined)   update.description   = body.description ?? null;
@@ -72,7 +74,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     const updated = await db.task.findFirst({ where: { id, userId } });
-    logActivity({ boardId: task.boardId, userId, action: 'updated', taskId: id, detail: changes });
+    logActivity({ boardId: task.boardId, userId, action, taskId: id, detail: changes });
 
     // Non-blocking email: notify new assignee when assigneeEmail is set or changed
     if (assigneeChanged && newAssigneeEmail) {

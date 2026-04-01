@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
+import { checkRateLimit } from '@/lib/rate-limit';
 import { z } from 'zod/v4';
 
 async function getUser(req: NextRequest) {
@@ -17,6 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const taskId = parseInt(id);
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { blocker_id } = BodySchema.parse(await req.json());
 
     // Verify task ownership
@@ -29,6 +31,10 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     // Verify blocker exists in same board
     const blocker = await db.task.findFirst({ where: { id: blocker_id, boardId: task.boardId } });
     if (!blocker) return fail('Blocker task not found', 404);
+
+    // M5: verify the authenticated user owns the board
+    const board = await db.board.findFirst({ where: { id: task.boardId, userId } });
+    if (!board) return fail('Unauthorized', 403);
 
     // Circular dependency guard
     const circular = await db.taskDependency.findFirst({
@@ -52,6 +58,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
   const taskId = parseInt(id);
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const { blocker_id } = BodySchema.parse(await req.json());
 
     // Verify task ownership

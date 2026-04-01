@@ -14,8 +14,13 @@ async function req<T>(
     { method, body: body ? JSON.stringify(body) : undefined },
     token,
   );
-  const json = await res.json();
-  if (!json.success) throw new Error(json.error ?? json.code ?? 'Request failed');
+  let json: any;
+  try {
+    json = await res.json();
+  } catch {
+    throw new Error(`Request failed (${res.status})`);
+  }
+  if (!res.ok || !json.success) throw new Error(json?.error ?? json?.code ?? `Request failed (${res.status})`);
   return json.data as T;
 }
 

@@ -15,6 +15,7 @@ async function getUser(req: NextRequest) {
 export async function GET(req: NextRequest) {
   try {
     const userId = await getUser(req);
+    if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const boardId = parseInt(req.nextUrl.searchParams.get('board_id') ?? '');
     if (!boardId || boardId < 1) return fail('board_id required', 400);
     const board = await db.board.findFirst({ where: { id: boardId, userId } });
@@ -29,12 +30,10 @@ export async function POST(req: NextRequest) {
   try {
     const userId = await getUser(req);
     if (!checkRateLimit(userId)) return fail('Too many requests', 429);
-    const body = await req.json();
-    const boardId = parseInt(body.board_id);
-    if (!boardId || boardId < 1) return fail('board_id required', 400);
+    const data = LabelCreateSchema.parse(await req.json());
+    const boardId = data.board_id;
     const board = await db.board.findFirst({ where: { id: boardId, userId } });
     if (!board) return fail('Board not found', 404);
-    const data = LabelCreateSchema.parse(body);
     const label = await db.label.create({ data: { boardId, name: data.name, color: data.color } });
     return ok(label, 201);
   } catch (e) { return handleError(e); }

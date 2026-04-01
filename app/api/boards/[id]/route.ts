@@ -42,7 +42,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!id || id < 1) return fail('Invalid board id', 400);
     const board = await db.board.findFirst({ where: { id, userId } });
     if (!board) return fail('Board not found', 404);
-    await db.board.delete({ where: { id } });
+    await db.board.delete({ where: { id, userId } });
     return ok(null);
   } catch (e) {
     return handleError(e);

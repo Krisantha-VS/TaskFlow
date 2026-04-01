@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { db } from '@/lib/db';
 import { pubsub } from '@/lib/pubsub';
+import { checkRateLimit } from '@/lib/rate-limit';
 
 const IDLE_TIMEOUT_MS = 60_000; // Force-unsubscribe a controller idle for 60s with no successful enqueue
 
@@ -16,6 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return new Response('Unauthorized', { status: 401 });
   }
   if (!payload?.sub) return new Response('Unauthorized', { status: 401 });
+  if (!checkRateLimit(payload.sub)) return new Response('Too many requests', { status: 429 });
 
   const board = await db.board.findFirst({ where: { id: boardId, userId: payload.sub } });
   if (!board) return new Response('Not found', { status: 404 });
