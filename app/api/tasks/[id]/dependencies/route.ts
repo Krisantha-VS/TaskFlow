@@ -32,10 +32,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     const blocker = await db.task.findFirst({ where: { id: blocker_id, boardId: task.boardId } });
     if (!blocker) return fail('Blocker task not found', 404);
 
-    // M5: verify the authenticated user owns the board
-    const board = await db.board.findFirst({ where: { id: task.boardId, userId } });
-    if (!board) return fail('Unauthorized', 403);
-
     // Circular dependency guard
     const circular = await db.taskDependency.findFirst({
       where: { blockerId: taskId, blockedId: blocker_id },
