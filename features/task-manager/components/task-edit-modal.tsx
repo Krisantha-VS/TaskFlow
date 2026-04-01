@@ -30,7 +30,7 @@ const COLOR_DOT: Record<string, string> = {
   gray:   'bg-gray-500',
 };
 
-function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<void> }) {
+function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<unknown> }) {
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
 
@@ -63,7 +63,7 @@ function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<void> })
   );
 }
 
-function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: string) => Promise<void> }) {
+function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: string) => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const [name, setName] = useState('');
   const [color, setColor] = useState<string>('blue');
@@ -112,7 +112,7 @@ function NewLabelForm({ onCreateLabel }: { onCreateLabel: (name: string, color: 
   );
 }
 
-function CommentInput({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
+function CommentInput({ onAdd }: { onAdd: (text: string) => Promise<unknown> }) {
   const [text, setText] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -148,24 +148,24 @@ function CommentInput({ onAdd }: { onAdd: (text: string) => Promise<void> }) {
 
 interface Props {
   task: Task;
-  onSave: (id: number, data: Partial<Task>) => Promise<void>;
+  onSave: (id: number, data: Partial<Task>) => Promise<unknown>;
   onClose: () => void;
   labels?: Label[];
   onAddLabel?: (labelId: number) => void;
   onRemoveLabel?: (labelId: number) => void;
-  onCreateLabel?: (name: string, color: string) => Promise<void>;
+  onCreateLabel?: (name: string, color: string) => Promise<unknown>;
   activity?: ActivityLog[];
   activityLoading?: boolean;
   subtasks?: Subtask[];
-  onCreateSubtask?: (title: string) => Promise<void>;
-  onToggleSubtask?: (id: number, completed: boolean) => Promise<void>;
-  onDeleteSubtask?: (id: number) => Promise<void>;
+  onCreateSubtask?: (title: string) => Promise<unknown>;
+  onToggleSubtask?: (id: number, completed: boolean) => Promise<unknown>;
+  onDeleteSubtask?: (id: number) => Promise<unknown>;
   comments?: Comment[];
-  onAddComment?: (text: string) => Promise<void>;
-  onDeleteComment?: (id: number) => Promise<void>;
+  onAddComment?: (text: string) => Promise<unknown>;
+  onDeleteComment?: (id: number) => Promise<unknown>;
   allTasks?: { id: number; title: string }[];
-  onAddDependency?: (blockerId: number) => Promise<void>;
-  onRemoveDependency?: (blockerId: number) => Promise<void>;
+  onAddDependency?: (blockerId: number) => Promise<unknown>;
+  onRemoveDependency?: (blockerId: number) => Promise<unknown>;
 }
 
 export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask, comments = [], onAddComment, onDeleteComment, allTasks, onAddDependency, onRemoveDependency }: Props) {
