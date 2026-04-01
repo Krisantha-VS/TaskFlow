@@ -41,11 +41,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ tok
     if (member.acceptedAt) return ok({ already: true, boardId: member.boardId });
 
     // C7: verify the authenticated user's email matches inviteEmail if set
-    if (member.inviteEmail) {
-      const user = await db.user.findUnique({ where: { id: userId } });
-      if (!user || user.email !== member.inviteEmail) {
-        return fail('Invite is for a different email address', 403);
-      }
+    if (member.inviteEmail && payload.email !== member.inviteEmail) {
+      return fail('Invite is for a different email address', 403);
     }
 
     const updated = await db.boardMember.update({
