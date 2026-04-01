@@ -232,15 +232,16 @@ export function useTasks(token: string | null, boardId: number | null) {
     }
   };
 
-  const addDependency = useCallback(async (taskId: number, blockerId: number) => {
-    if (!token) return;
+  const addDependency = useCallback(async (taskId: number, blockerId: number): Promise<{ error: string | null }> => {
+    if (!token) return { error: null };
     try {
       await taskApi.addDependency(token, taskId, blockerId);
-      // Reload to get fresh blockedBy array
       await load();
+      return { error: null };
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to add dependency';
       setMutationError(msg);
+      return { error: msg };
     }
   }, [token, load]);
 

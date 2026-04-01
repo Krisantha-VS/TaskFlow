@@ -478,7 +478,8 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                   defaultValue=""
                   onChange={async e => {
                     if (!e.target.value) return;
-                    await onAddDependency(parseInt(e.target.value));
+                    const result = await onAddDependency(parseInt(e.target.value)) as { error?: string | null } | void;
+                    if (result?.error) { setSaveError(result.error); return; }
                     e.target.value = '';
                   }}
                   className="w-full px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
