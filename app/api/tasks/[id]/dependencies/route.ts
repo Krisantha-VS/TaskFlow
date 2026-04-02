@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server';
+import { Prisma } from '@prisma/client';
 import { db } from '@/lib/db';
 import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
@@ -38,11 +39,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     });
     if (circular) return fail('Circular dependency', 400);
 
-    const dep = await db.taskDependency.upsert({
-      where: { blockerId_blockedId: { blockerId: blocker_id, blockedId: taskId } },
-      update: {},
-      create: { blockerId: blocker_id, blockedId: taskId },
-    });
+    // upsert with empty update:{} is unreliable on the Neon HTTP adapter — use create + P2002 catch
+    let dep;
+    try {
+      dep = await db.taskDependency.create({ data: { blockerId: blocker_id, blockedId: taskId } });
+    } catch (createErr) {
+      if (createErr instanceof Prisma.PrismaClientKnownRequestError && createErr.code === 'P2002') {
+        // Already exists — fetch and return it
+        dep = await db.taskDependency.findFirst({ where: { blockerId: blocker_id, blockedId: taskId } });
+      } else {
+        throw createErr;
+      }
+    }
     return ok(dep, 201);
   } catch (e) {
     return handleError(e);
