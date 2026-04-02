@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { Plus, Inbox } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useReducedMotion } from '@/lib/useMotion';
 import { type Task, type TaskStatus, PRIORITY_CONFIG } from '../types';
 import { TaskCard } from './task-card';
 import { cn } from '@/lib/utils';
@@ -36,6 +37,7 @@ function KanbanColumn({
   const [title, setTitle]       = useState('');
   const [priority, setPriority] = useState<Task['priority']>('medium');
   const [desc, setDesc]         = useState('');
+  const reduceMotion = useReducedMotion();
 
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
@@ -63,20 +65,18 @@ function KanbanColumn({
       onDrop={handleDrop}
     >
       {/* Column header */}
-      <div className={cn('px-4 py-3 border-b-2 border-border flex items-center justify-between rounded-t-xl group', colorClass)}>
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-semibold">{label}</span>
-          <span className="text-xs bg-background/60 text-muted-foreground px-2 py-0.5 rounded-full">
-            {tasks.length}
-          </span>
-          <button
-            onClick={() => onSelectAll?.(tasks.map(t => t.id))}
-            className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[10px] text-muted-foreground hover:text-foreground transition-all ml-auto focus:outline-none focus:ring-2 focus:ring-primary rounded"
-          >
-            Select all
-          </button>
-        </div>
-        {/* Fix AC1: aria-label on icon-only Plus button */}
+      <div className={cn('px-4 py-3 border-b-2 border-border flex items-center gap-2 rounded-t-xl group', colorClass)}>
+        <span className="text-sm font-semibold">{label}</span>
+        <span className="text-xs bg-background/60 text-muted-foreground px-2 py-0.5 rounded-full">
+          {tasks.length}
+        </span>
+        <div className="flex-1" />
+        <button
+          onClick={() => onSelectAll?.(tasks.map(t => t.id))}
+          className="opacity-0 group-hover:opacity-100 focus:opacity-100 text-[10px] text-muted-foreground hover:text-foreground transition-all focus:outline-none focus:ring-2 focus:ring-primary rounded px-1"
+        >
+          Select all
+        </button>
         <button
           onClick={() => setAdding(true)}
           aria-label={`Add task to ${label}`}
@@ -92,10 +92,10 @@ function KanbanColumn({
           {tasks.map(task => (
             <motion.div
               key={task.id}
-              initial={{ opacity: 0, y: -6 }}
+              initial={{ opacity: 0, y: reduceMotion ? 0 : -6 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, transition: { duration: 0.06 } }}
-              transition={{ duration: 0.12, ease: 'easeOut' }}
+              exit={{ opacity: 0, transition: { duration: reduceMotion ? 0 : 0.06 } }}
+              transition={{ duration: reduceMotion ? 0 : 0.12, ease: 'easeOut' }}
             >
               <TaskCard
                 task={task}

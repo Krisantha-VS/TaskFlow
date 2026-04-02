@@ -22,7 +22,7 @@
 | F5 | Real-time sync (SSE / WebSocket) | ✅ done |
 | F6 | Board sharing (invite by email, roles) | ✅ done |
 
-**Progress: 14 / 14 features — 100% ✅** | Last audit: 2026-03-27 (ORG-001 + ORG-002 improvements committed, not pushed)
+**Progress: 14 / 14 features — 100% ✅** | Last audit: 2026-04-01 (ORG-001 audit + ORG-003 fix sprint — 30 issues resolved, pushed `9f49867`)
 
 ---
 

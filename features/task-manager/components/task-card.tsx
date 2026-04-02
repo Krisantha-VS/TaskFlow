@@ -2,6 +2,7 @@
 
 import React, { useRef, useMemo, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useReducedMotion } from '@/lib/useMotion';
 import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar } from 'lucide-react';
 import { type Task, PRIORITY_CONFIG, COLUMNS } from '../types';
 import { cn } from '@/lib/utils';
@@ -35,6 +36,7 @@ function getDueDateStyle(dueDate: string | null | undefined): { label: string; c
 
 function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onDragEnd, onEdit, isSelected, onToggleSelect }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const reduceMotion = useReducedMotion();
   const priority = PRIORITY_CONFIG[task.priority];
   const due = useMemo(() => getDueDateStyle(task.due_date), [task.due_date]);
 
@@ -135,7 +137,7 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
                 initial={{ opacity: 0, height: 0 }}
                 animate={{ opacity: 1, height: 'auto' }}
                 exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.2 }}
+                transition={{ duration: reduceMotion ? 0 : 0.2 }}
                 className="mt-1.5 text-xs text-muted-foreground leading-relaxed overflow-hidden"
               >
                 {task.description}

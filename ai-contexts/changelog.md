@@ -4,6 +4,23 @@
 
 ---
 
+## 2026-04-01 (Session 4)
+
+**Commit:** `9f49867` — pushed to remote, Vercel deploying
+
+**What changed:** Full security + bug fix sprint via ORG-001 audit → ORG-003 fix team (21 files, 256 insertions)
+
+**Key fixes:**
+- Kanban move bug: `handleDrop` dead catch replaced with `{ error }` destructure; PATCH now logs `'moved'` for SSE; bulk allSettled checks `r.value.error`
+- Invite auth: JWT required before DB access on GET; POST verifies `inviteEmail` matches caller
+- Board DELETE: `userId` added to final delete query (TOCTOU)
+- Label cross-board: POST/DELETE verify label belongs to task's board
+- Rate limiting: 21 handlers across 13 routes now protected
+- Sprint dates: ISO datetime validation added
+- Frontend: `req()` checks `res.ok`; all silent error swallowers fixed with rollback + `mutationError`; SSE retries after 5s; modal fetch dedup via ref
+
+---
+
 ## 2026-03-27 (Session 3)
 
 **Commits:** `bb5a84d` (ORG-001 audit) · `af9d3a0` (ORG-002 UI/UX) — NOT pushed to remote

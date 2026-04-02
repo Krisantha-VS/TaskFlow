@@ -1,7 +1,9 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { motion } from 'framer-motion';
 import { X, ChevronDown } from 'lucide-react';
+import { useReducedMotion } from '@/lib/useMotion';
 import { type Task, type Label, type ActivityLog, type Subtask, type Comment, PRIORITY_CONFIG } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
@@ -176,6 +178,8 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   const [recurrence, setRecurrence]   = useState<'daily' | 'weekly' | 'monthly' | null>(task.recurrence ?? null);
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null); // Fix K3
+  const reduceMotion = useReducedMotion();
+  const motionDuration = reduceMotion ? 0 : 0.2;
   const [showAllActivity, setShowAllActivity] = useState(false);
   const [activityOpen, setActivityOpen] = useState(false);
 
@@ -265,12 +269,20 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   };
 
   return (
-    <div
+    <motion.div
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: motionDuration }}
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm"
       onClick={onClose}
     >
       {/* Fix AC2: role=dialog, aria-modal, aria-labelledby */}
-      <div
+      <motion.div
+        initial={{ opacity: 0, scale: 0.95 }}
+        animate={{ opacity: 1, scale: 1 }}
+        exit={{ opacity: 0, scale: 0.95 }}
+        transition={{ duration: motionDuration, ease: 'easeOut' }}
         ref={modalRef}
         role="dialog"
         aria-modal="true"
@@ -465,7 +477,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider mb-2">Blocked by</p>
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {(task.blockedBy ?? []).map(dep => (
-                  <span key={dep.id} className="inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full bg-red-500/10 border border-red-500/20 text-red-400">
+                  <span key={dep.id} className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full">
                     🔒 {dep.blocker.title}
                     {onRemoveDependency && (
                       <button type="button" onClick={() => onRemoveDependency(dep.blockerId)} className="hover:text-red-300 ml-0.5">×</button>
@@ -584,8 +596,8 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               disabled={saving || !title.trim()}
               aria-disabled={saving || !title.trim()}
               className={cn(
-                'text-sm font-medium px-5 py-2 rounded-lg transition-all',
-                'bg-gradient-to-r from-blue-500 to-cyan-500 text-white hover:from-blue-600 hover:to-cyan-600',
+                'text-sm font-medium px-5 py-2 rounded-lg transition-opacity',
+                'bg-primary text-primary-foreground hover:opacity-90',
                 'disabled:opacity-50 disabled:cursor-not-allowed'
               )}
             >
@@ -593,7 +605,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
             </button>
           </div>
         </div>
-      </div>
-    </div>
+      </motion.div>
+    </motion.div>
   );
 }

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useReducedMotion } from '@/lib/useMotion';
 import { Search, X, Columns, Download, BarChart2, Users } from 'lucide-react';
 import { DEFAULT_COLUMNS, type Board, type BoardColumn, type Task, type TaskStatus, type TaskPriority } from '../types';
 import { KanbanColumn } from './kanban-column';
@@ -57,6 +59,8 @@ interface Toast {
 let _toastId = 0;
 
 export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
+  const reduceMotion = useReducedMotion();
+  const toastDuration = reduceMotion ? 0 : 0.15;
   const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, createSprint, deleteSprint } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask]   = useState<Task | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
@@ -119,6 +123,13 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
+  }, [exportOpen]);
+
+  // Auto-focus first menu item when export menu opens (T1-6)
+  useEffect(() => {
+    if (!exportOpen) return;
+    const firstItem = exportRef.current?.querySelector<HTMLElement>('[role="menuitem"]');
+    setTimeout(() => firstItem?.focus(), 0);
   }, [exportOpen]);
 
   const handleExport = async (format: 'csv' | 'ics') => {
@@ -337,7 +348,16 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
               <div
                 role="menu"
                 className="absolute right-0 top-full mt-1 z-20 glass border border-border rounded-xl shadow-xl py-1 w-36"
-                onKeyDown={e => { if (e.key === 'Escape') setExportOpen(false); }}
+                onKeyDown={e => {
+                  if (e.key === 'Escape') { setExportOpen(false); return; }
+                  if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    const items = Array.from(exportRef.current?.querySelectorAll<HTMLElement>('[role="menuitem"]') ?? []);
+                    const idx = items.indexOf(document.activeElement as HTMLElement);
+                    if (e.key === 'ArrowDown') items[(idx + 1) % items.length]?.focus();
+                    else items[(idx - 1 + items.length) % items.length]?.focus();
+                  }
+                }}
               >
                 <button role="menuitem" onClick={() => { handleExport('csv'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">CSV Spreadsheet</button>
                 <button role="menuitem" onClick={() => { handleExport('ics'); setExportOpen(false); }} className="w-full text-left px-3 py-2 text-xs hover:bg-muted/40 transition-colors">Calendar (.ics)</button>
@@ -491,29 +511,32 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         </div>
       )}
 
-      {editingTask && (
-        <TaskEditModal
-          task={editingTask}
-          onSave={async (id, data) => { await updateTask(id, data); }}
-          onClose={() => { setEditingTaskId(null); setTimeout(() => lastFocusRef.current?.focus(), 0); }}
-          labels={labels}
-          onAddLabel={(labelId) => addTaskLabel(editingTask.id, labelId)}
-          onRemoveLabel={(labelId) => removeTaskLabel(editingTask.id, labelId)}
-          onCreateLabel={createLabel}
-          activity={activity}
-          activityLoading={activityLoading}
-          subtasks={subtasks[editingTask.id] ?? []}
-          onCreateSubtask={(title) => createSubtask(editingTask.id, title)}
-          onToggleSubtask={(id, completed) => toggleSubtask(editingTask.id, id, completed)}
-          onDeleteSubtask={(id) => deleteSubtask(editingTask.id, id)}
-          comments={comments[editingTask.id] ?? []}
-          onAddComment={(text) => addComment(editingTask.id, text)}
-          onDeleteComment={(id) => deleteComment(editingTask.id, id)}
-          allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
-          onAddDependency={(blockerId) => addDependency(editingTask.id, blockerId)}
-          onRemoveDependency={(blockerId) => removeDependency(editingTask.id, blockerId)}
-        />
-      )}
+      <AnimatePresence>
+        {editingTask && (
+          <TaskEditModal
+            key={editingTask.id}
+            task={editingTask}
+            onSave={async (id, data) => { await updateTask(id, data); }}
+            onClose={() => { setEditingTaskId(null); setTimeout(() => lastFocusRef.current?.focus(), 0); }}
+            labels={labels}
+            onAddLabel={(labelId) => addTaskLabel(editingTask.id, labelId)}
+            onRemoveLabel={(labelId) => removeTaskLabel(editingTask.id, labelId)}
+            onCreateLabel={createLabel}
+            activity={activity}
+            activityLoading={activityLoading}
+            subtasks={subtasks[editingTask.id] ?? []}
+            onCreateSubtask={(title) => createSubtask(editingTask.id, title)}
+            onToggleSubtask={(id, completed) => toggleSubtask(editingTask.id, id, completed)}
+            onDeleteSubtask={(id) => deleteSubtask(editingTask.id, id)}
+            comments={comments[editingTask.id] ?? []}
+            onAddComment={(text) => addComment(editingTask.id, text)}
+            onDeleteComment={(id) => deleteComment(editingTask.id, id)}
+            allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
+            onAddDependency={(blockerId) => addDependency(editingTask.id, blockerId)}
+            onRemoveDependency={(blockerId) => removeDependency(editingTask.id, blockerId)}
+          />
+        )}
+      </AnimatePresence>
 
       {showAnalytics && (
         <AnalyticsPanel token={token} boardId={boardId} onClose={() => setShowAnalytics(false)} />
@@ -543,29 +566,51 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
       />
 
       {/* Undo toast */}
-      {undoToast && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-2.5 rounded-full text-sm font-medium shadow-lg flex items-center gap-2 animate-in fade-in slide-in-from-bottom-2">
-          {undoToast}
-        </div>
-      )}
+      <AnimatePresence>
+        {undoToast && (
+          <motion.div
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 8 }}
+            transition={{ duration: toastDuration }}
+            role="status"
+            aria-live="assertive"
+            aria-atomic="true"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-2.5 rounded-full text-sm font-medium shadow-lg flex items-center gap-2"
+          >
+            {undoToast}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
       {/* Screen reader live region */}
       <div aria-live="polite" aria-atomic="true" className="sr-only" id="board-status" />
 
       {/* Fix K5: Toast stack */}
-      <div className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 pointer-events-none">
-        {toasts.map(toast => (
-          <div
-            key={toast.id}
-            className={`glass rounded-lg px-4 py-2 text-sm border pointer-events-auto transition-all ${
-              toast.type === 'success'
-                ? 'border-success/50 text-success'
-                : 'border-destructive/50 text-destructive'
-            }`}
-          >
-            {toast.message}
-          </div>
-        ))}
+      <div
+        role="status"
+        aria-live="polite"
+        aria-atomic="false"
+        className="fixed bottom-4 right-4 flex flex-col gap-2 z-50 pointer-events-none"
+      >
+        <AnimatePresence>
+          {toasts.map(toast => (
+            <motion.div
+              key={toast.id}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 8 }}
+              transition={{ duration: toastDuration }}
+              className={`glass rounded-lg px-4 py-2 text-sm border pointer-events-auto ${
+                toast.type === 'success'
+                  ? 'border-success/50 text-success'
+                  : 'border-destructive/50 text-destructive'
+              }`}
+            >
+              {toast.message}
+            </motion.div>
+          ))}
+        </AnimatePresence>
       </div>
     </>
   );
