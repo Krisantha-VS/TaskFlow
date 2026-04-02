@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { ChevronUp, ChevronDown } from 'lucide-react';
 import type { BoardColumn } from '@/features/task-manager/types';
 import { DEFAULT_COLUMNS } from '@/features/task-manager/types';
 
@@ -25,9 +26,27 @@ export function ColumnEditor({ columns, onSave, onCancel }: Props) {
           Reset
         </button>
       </div>
-      <div className="flex flex-wrap gap-2 mb-4">
+      <div className="flex flex-col gap-2 mb-4">
         {cols.map((col, idx) => (
-          <div key={col.key} className="flex items-center gap-1 bg-muted/50 rounded-lg px-2 py-1.5">
+          <div key={col.key} className="flex items-center gap-1.5 bg-muted/50 rounded-lg px-2 py-1.5">
+            <div className="flex flex-col">
+              <button
+                onClick={() => setCols(prev => { const a = [...prev]; [a[idx - 1], a[idx]] = [a[idx], a[idx - 1]]; return a; })}
+                disabled={idx === 0}
+                aria-label={`Move ${col.label} up`}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity leading-none"
+              >
+                <ChevronUp className="w-3 h-3" aria-hidden="true" />
+              </button>
+              <button
+                onClick={() => setCols(prev => { const a = [...prev]; [a[idx + 1], a[idx]] = [a[idx], a[idx + 1]]; return a; })}
+                disabled={idx === cols.length - 1}
+                aria-label={`Move ${col.label} down`}
+                className="text-muted-foreground hover:text-foreground disabled:opacity-20 transition-opacity leading-none"
+              >
+                <ChevronDown className="w-3 h-3" aria-hidden="true" />
+              </button>
+            </div>
             <label htmlFor={`col-name-${col.key}`} className="sr-only">
               Column name
             </label>
@@ -38,7 +57,7 @@ export function ColumnEditor({ columns, onSave, onCancel }: Props) {
               onChange={e =>
                 setCols(prev => prev.map((c, i) => i === idx ? { ...c, label: e.target.value } : c))
               }
-              className="bg-transparent text-sm outline-none w-28 border-b border-transparent focus:border-primary"
+              className="bg-transparent text-sm outline-none flex-1 border-b border-transparent focus:border-primary"
             />
             {cols.length > 1 && (
               <button
