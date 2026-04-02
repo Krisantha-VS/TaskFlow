@@ -19,7 +19,7 @@ interface LabelPillProps {
 export function LabelPill({ name, color, onRemove, small }: LabelPillProps) {
   const cls = COLOR_MAP[color] ?? COLOR_MAP.gray;
   return (
-    <span className={`inline-flex items-center gap-1 border rounded-full font-medium ${small ? 'text-[10px] px-1.5 py-0' : 'text-xs px-2 py-0.5'} ${cls}`}>
+    <span className={`inline-flex items-center gap-1 border rounded-full font-medium ${small ? 'text-xs px-1.5 py-0' : 'text-xs px-2 py-0.5'} ${cls}`}>
       {name}
       {onRemove && (
         <button onClick={onRemove} aria-label={`Remove label: ${name}`} className="hover:opacity-70 transition-opacity leading-none">×</button>

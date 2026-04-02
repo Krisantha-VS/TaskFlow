@@ -28,7 +28,12 @@ export function ColumnEditor({ columns, onSave, onCancel }: Props) {
       <div className="flex flex-wrap gap-2 mb-4">
         {cols.map((col, idx) => (
           <div key={col.key} className="flex items-center gap-1 bg-muted/50 rounded-lg px-2 py-1.5">
+            <label htmlFor={`col-name-${col.key}`} className="sr-only">
+              Column name
+            </label>
             <input
+              id={`col-name-${col.key}`}
+              aria-label={`Column name: ${col.label}`}
               value={col.label}
               onChange={e =>
                 setCols(prev => prev.map((c, i) => i === idx ? { ...c, label: e.target.value } : c))
@@ -38,6 +43,7 @@ export function ColumnEditor({ columns, onSave, onCancel }: Props) {
             {cols.length > 1 && (
               <button
                 onClick={() => setCols(prev => prev.filter((_, i) => i !== idx))}
+                aria-label={`Delete column: ${col.label}`}
                 className="text-muted-foreground hover:text-destructive text-xs"
               >
                 ×

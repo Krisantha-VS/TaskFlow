@@ -98,9 +98,15 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
     if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const id = parseInt((await params).id);
     if (!id || id < 1) return fail('Invalid task id', 400);
-    const task = await db.task.findFirst({ where: { id, userId } });
+    const task = await db.task.findFirst({ where: { id, userId, deletedAt: null } });
     if (!task) return fail('Task not found', 404);
-    await db.task.delete({ where: { id } });
+    // x-hard-delete: permanent delete (from trash panel) — otherwise soft delete (T3-3)
+    const hardDelete = req.headers.get('x-hard-delete') === '1';
+    if (hardDelete) {
+      await db.task.delete({ where: { id } });
+    } else {
+      await db.task.update({ where: { id }, data: { deletedAt: new Date() } });
+    }
     logActivity({ boardId: task.boardId, userId, action: 'deleted', taskId: id, detail: task.title });
     return ok(null);
   } catch (e) {

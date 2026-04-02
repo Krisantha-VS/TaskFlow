@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { Plus, Trash2, LogOut, Kanban, Menu, X, Sun, Moon, Monitor } from 'lucide-react';
+import { Plus, Trash2, LogOut, Kanban, Menu, X, Sun, Moon, Monitor, ChevronRight } from 'lucide-react';
 import { useTheme, type Theme } from '@/components/theme-provider';
 import { KanbanBoard } from './kanban-board';
 import { useBoards } from '../hooks/useTasks';
@@ -515,6 +515,13 @@ export function TaskManagerApp() {
 
   return (
     <div className="flex h-[calc(100vh-3rem)] relative">
+      {/* T3-8: Skip navigation link */}
+      <a
+        href="#main-content"
+        className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-50 focus:px-4 focus:py-2 focus:bg-primary focus:text-primary-foreground focus:rounded-lg focus:text-sm focus:font-medium"
+      >
+        Skip to main content
+      </a>
       {/* ── Desktop sidebar ── */}
       <aside className="hidden md:flex w-60 border-r border-border bg-background/60 backdrop-blur-sm flex-col shrink-0">
         {sidebarContent}
@@ -539,7 +546,7 @@ export function TaskManagerApp() {
       </aside>
 
       {/* ── Main content ── */}
-      <main className="flex-1 overflow-auto flex flex-col min-w-0">
+      <main id="main-content" className="flex-1 overflow-auto flex flex-col min-w-0">
         {/* Mobile top bar */}
         <div className="md:hidden flex items-center gap-3 px-4 py-3 border-b border-border bg-background/60 backdrop-blur-sm shrink-0">
           <button
@@ -561,7 +568,13 @@ export function TaskManagerApp() {
         <div className="flex-1 overflow-auto p-4 md:p-6">
           {activeBoard ? (
             <>
+              {/* T3-1: Breadcrumb */}
               <div className="mb-6 hidden md:block">
+                <nav aria-label="Breadcrumb" className="flex items-center gap-1 text-xs text-muted-foreground mb-1.5">
+                  <span>Dashboard</span>
+                  <ChevronRight className="w-3 h-3" aria-hidden="true" />
+                  <span className="text-foreground font-medium">{activeBoard.name}</span>
+                </nav>
                 <h1 className="text-xl font-bold">{activeBoard.name}</h1>
                 <p className="text-sm text-muted-foreground">Drag tasks between columns to update status</p>
               </div>

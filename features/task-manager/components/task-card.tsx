@@ -1,23 +1,22 @@
 'use client';
 
-import React, { useRef, useMemo, useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useReducedMotion } from '@/lib/useMotion';
+import React, { useMemo, useState } from 'react';
+import { useDraggable } from '@dnd-kit/core';
+import { AnimatePresence, motion } from 'framer-motion';
 import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar } from 'lucide-react';
 import { type Task, PRIORITY_CONFIG, COLUMNS } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
+import { useReducedMotion } from '@/lib/useMotion';
 
 interface Props {
   task: Task;
   onDelete: (id: number) => void;
   onStatusChange: (id: number, status: Task['status']) => void;
-  isDragging?: boolean;
-  onDragStart: (e: React.DragEvent, task: Task) => void;
-  onDragEnd: () => void; // Fix K1: required onDragEnd prop
-  onEdit: (task: Task) => void; // Fix T3: required, not optional
+  onEdit: (task: Task) => void;
   isSelected?: boolean;
   onToggleSelect?: (id: number) => void;
+  isDragOverlay?: boolean;
 }
 
 function getDueDateStyle(dueDate: string | null | undefined): { label: string; className: string } | null {
@@ -34,58 +33,69 @@ function getDueDateStyle(dueDate: string | null | undefined): { label: string; c
   return { label, className: 'text-muted-foreground bg-muted/50' };
 }
 
-function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onDragEnd, onEdit, isSelected, onToggleSelect }: Props) {
+function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggleSelect, isDragOverlay }: Props) {
   const [expanded, setExpanded] = useState(false);
   const reduceMotion = useReducedMotion();
   const priority = PRIORITY_CONFIG[task.priority];
   const due = useMemo(() => getDueDateStyle(task.due_date), [task.due_date]);
-
-  // Fix K4: track whether a drag occurred to suppress click-to-edit after drop
-  const didDrag = useRef(false);
-
-  // Fix M1: build the list of other statuses for the mobile "Move to" select
   const otherStatuses = COLUMNS.filter(c => c.key !== task.status);
+
+  const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
+    id: task.id,
+    disabled: !!isDragOverlay,
+  });
 
   return (
     <div
-      draggable
-      onDragStart={e => {
-        didDrag.current = true; // Fix K4
-        onDragStart(e, task);
-      }}
-      onDragEnd={() => {
-        onDragEnd(); // Fix K1
-        setTimeout(() => { didDrag.current = false; }, 100); // Fix K4
-      }}
-      onClick={() => {
-        if (didDrag.current) return; // Fix K4: suppress click after drag
+      ref={setNodeRef}
+      {...attributes}
+      onClick={(e: React.MouseEvent) => {
+        if (isDragOverlay) return;
+        if (e.metaKey || e.ctrlKey) {
+          e.stopPropagation();
+          onToggleSelect?.(task.id);
+          return;
+        }
         onEdit(task);
       }}
       className={cn(
-        'relative glass rounded-xl p-4 cursor-grab active:cursor-grabbing border border-border transition-[opacity,transform,box-shadow] group',
-        isDragging && 'opacity-40 scale-95',
+        'relative glass rounded-xl p-4 border border-border group',
+        'transition-[opacity,box-shadow] duration-100',
+        isDragging && !isDragOverlay && 'opacity-30',
+        isDragOverlay ? 'cursor-grabbing shadow-2xl' : 'cursor-pointer',
         isSelected && 'ring-1 ring-primary/40'
       )}
     >
-      {/* Selection checkbox */}
+      {/* Drag handle */}
+      <div
+        {...listeners}
+        onClick={e => e.stopPropagation()}
+        className="absolute top-3.5 left-1.5 text-muted-foreground/40 hover:text-muted-foreground cursor-grab active:cursor-grabbing touch-none p-0.5"
+      >
+        <GripVertical className="w-3.5 h-3.5" aria-hidden="true" />
+      </div>
+
+      {/* Selection checkbox — always visible (T2-2) */}
       <button
         onClick={e => { e.stopPropagation(); onToggleSelect?.(task.id); }}
         aria-label={isSelected ? `Deselect task: ${task.title}` : `Select task: ${task.title}`}
         aria-pressed={isSelected}
-        className={`absolute top-2 left-2 w-4 h-4 rounded border flex items-center justify-center transition-all z-10 focus:outline-none focus:ring-2 focus:ring-primary ${
+        className={cn(
+          'absolute top-2 left-6 w-4 h-4 rounded border flex items-center justify-center transition-all z-10',
+          'focus:outline-none focus:ring-2 focus:ring-primary',
           isSelected
-            ? 'bg-primary border-primary opacity-100'
-            : 'border-border bg-background opacity-0 group-hover:opacity-100'
-        }`}
+            ? 'bg-primary border-primary'
+            : 'border-border/40 bg-background/70'
+        )}
       >
-        {isSelected && <span className="text-primary-foreground text-[10px] leading-none">✓</span>}
+        {isSelected && <span className="text-primary-foreground text-xs leading-none">✓</span>}
       </button>
 
       {/* Header */}
-      <div className="flex items-start gap-2">
-        <GripVertical className="w-4 h-4 text-muted-foreground/40 mt-0.5 shrink-0" />
+      <div className="flex items-start gap-2 ml-5">
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-medium leading-snug break-words">{task.title}</p>
+          {/* T2-4: font-semibold */}
+          <p className="text-sm font-semibold leading-snug break-words">{task.title}</p>
           {task.subtasks && task.subtasks.length > 0 && (
             <div className="flex items-center gap-2 mt-1.5">
               <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
@@ -94,40 +104,39 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
                   style={{ width: `${Math.round((task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-muted-foreground shrink-0">
+              {/* T2-4: text-xs instead of text-[10px] */}
+              <span className="text-xs text-muted-foreground shrink-0">
                 {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
               </span>
             </div>
           )}
         </div>
-        {/* Fix AC1: aria-label on edit button */}
         <button
           onClick={e => { e.stopPropagation(); onEdit(task); }}
           aria-label={`Edit task: ${task.title}`}
           className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-primary transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary rounded"
         >
-          <Pencil className="w-3.5 h-3.5" />
+          <Pencil className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
-        {/* Fix AC1: aria-label on delete button */}
         <button
           onClick={e => { e.stopPropagation(); onDelete(task.id); }}
           aria-label={`Delete task: ${task.title}`}
           className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all shrink-0 focus:outline-none focus:ring-2 focus:ring-primary rounded"
         >
-          <Trash2 className="w-3.5 h-3.5" />
+          <Trash2 className="w-3.5 h-3.5" aria-hidden="true" />
         </button>
       </div>
 
-      {/* Description */}
+      {/* Description expand */}
       {task.description && (
-        <div className="mt-2 ml-6">
+        <div className="mt-2 ml-5">
           <button
             onClick={e => { e.stopPropagation(); setExpanded(!expanded); }}
             aria-label={expanded ? 'Collapse task details' : 'Expand task details'}
             aria-expanded={expanded}
             className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground transition-colors focus:outline-none focus:ring-2 focus:ring-primary rounded"
           >
-            <ChevronDown className={cn('w-3 h-3 transition-transform', expanded && 'rotate-180')} />
+            <ChevronDown className={cn('w-3 h-3 transition-transform', expanded && 'rotate-180')} aria-hidden="true" />
             {expanded ? 'Hide' : 'Details'}
           </button>
           <AnimatePresence initial={false}>
@@ -149,35 +158,36 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
 
       {/* Labels */}
       {task.labels && task.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5 ml-6">
+        <div className="flex flex-wrap gap-1 mt-1.5 ml-5">
           {task.labels.map(l => (
             <LabelPill key={l.id} name={l.name} color={l.color} small />
           ))}
         </div>
       )}
 
-      {/* Blocked badge */}
+      {/* T2-6: Blocked badge with blocker name */}
       {task.blockedBy && task.blockedBy.length > 0 && (
-        <div className="mt-1.5 ml-6">
-          <span className="badge-overdue inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium">
-            🔒 Blocked
+        <div className="mt-1.5 ml-5">
+          <span className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium">
+            🔒 {task.blockedBy[0].blocker.title}
+            {task.blockedBy.length > 1 && ` +${task.blockedBy.length - 1}`}
           </span>
         </div>
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between mt-3 ml-6">
+      <div className="flex items-center justify-between mt-3 ml-5">
         <div className="flex items-center gap-1.5">
           <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', priority.classes)}>
             {priority.label}
           </span>
           {task.recurrence && (
-            <span className="badge-info text-[10px] px-1.5 py-0.5 rounded-full">
+            <span className="badge-info text-xs px-1.5 py-0.5 rounded-full">
               ↻ {task.recurrence}
             </span>
           )}
           {task.sprintId && (
-            <span className="badge-primary text-[10px] px-1.5 py-0.5 rounded-full">
+            <span className="badge-primary text-xs px-1.5 py-0.5 rounded-full">
               ⚡ Sprint
             </span>
           )}
@@ -185,7 +195,7 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
         <div className="flex items-center gap-2">
           {due ? (
             <span className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${due.className}`}>
-              <Calendar className="w-3 h-3" />
+              <Calendar className="w-3 h-3" aria-hidden="true" />
               {due.label}
             </span>
           ) : (
@@ -196,13 +206,13 @@ function TaskCard({ task, onDelete, onStatusChange, isDragging, onDragStart, onD
         </div>
       </div>
 
-      {/* Fix M1: Mobile-only "Move to" fallback for touch devices (HTML5 DnD unavailable) */}
-      {otherStatuses.length > 0 && (
+      {/* Mobile "Move to" */}
+      {!isDragOverlay && otherStatuses.length > 0 && (
         <div
-          className="md:hidden flex items-center gap-1.5 mt-2 ml-6"
+          className="md:hidden flex items-center gap-1.5 mt-2 ml-5"
           onClick={e => e.stopPropagation()}
         >
-          <ChevronRight className="w-3 h-3 text-muted-foreground/50 shrink-0" />
+          <ChevronRight className="w-3 h-3 text-muted-foreground/50 shrink-0" aria-hidden="true" />
           <label className="text-xs text-muted-foreground/60 shrink-0">Move to:</label>
           <select
             aria-label="Move task to column"

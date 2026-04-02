@@ -178,6 +178,8 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   const [recurrence, setRecurrence]   = useState<'daily' | 'weekly' | 'monthly' | null>(task.recurrence ?? null);
   const [saving, setSaving]           = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null); // Fix K3
+  const [subtasksOpen, setSubtasksOpen] = useState(false); // T2-3: collapsible
+  const [blockersOpen, setBlockersOpen] = useState(false); // T2-3: collapsible, closed by default
   const reduceMotion = useReducedMotion();
   const motionDuration = reduceMotion ? 0 : 0.2;
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -188,6 +190,12 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
 
   // Sync fields if the task prop updates externally (e.g. label/subtask mutations refresh the task)
   // Only sync fields that are not currently being edited (i.e. when not saving)
+  // Open subtasks if they exist when modal first loads
+  useEffect(() => {
+    setSubtasksOpen(subtasks.length > 0);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // only on mount
+
   useEffect(() => {
     if (saving) return;
     setTitle(task.title);
@@ -299,7 +307,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
             aria-label="Close dialog"
             className="text-muted-foreground hover:text-foreground transition-colors"
           >
-            <X className="w-4 h-4" />
+            <X className="w-4 h-4" aria-hidden="true" />
           </button>
         </div>
 
@@ -359,14 +367,14 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
               />
               {dueDate && new Date(dueDate) < new Date(new Date().toDateString()) && (
-                <p className="text-[10px] text-red-400 font-medium">Past due</p>
+                <p className="text-xs text-red-400 font-medium">Past due</p>
               )}
             </div>
           </div>
 
-          {/* Recurrence */}
+          {/* Recurrence — T3-7: renamed + tooltip */}
           <div className="space-y-1.5">
-            <label htmlFor="task-repeat-field" className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Repeat</label>
+            <label htmlFor="task-repeat-field" className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">Recurring task</label>
             <select
               id="task-repeat-field"
               value={recurrence ?? ''}
@@ -378,83 +386,22 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               <option value="weekly">Weekly</option>
               <option value="monthly">Monthly</option>
             </select>
+            {recurrence && (
+              <p className="text-xs text-muted-foreground/60">A new task will be created automatically on this schedule.</p>
+            )}
           </div>
 
           {/* Zone 2 divider */}
           <div className="border-t border-border/50" />
 
-          {/* Subtasks */}
-          {(onCreateSubtask || onToggleSubtask || onDeleteSubtask) && (
-            <div>
-              <div className="flex items-center justify-between mb-2">
-                <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider">
-                  Checklist
-                  {subtasks.length > 0 && (
-                    <span className="ml-1 text-muted-foreground/60 normal-case tracking-normal">
-                      ({subtasks.filter(s => s.completed).length}/{subtasks.length})
-                    </span>
-                  )}
-                </p>
-              </div>
-
-              {/* Progress bar */}
-              {subtasks.length > 0 && (
-                <div className="w-full h-1.5 bg-muted rounded-full mb-3 overflow-hidden">
-                  <div
-                    className="h-full bg-primary rounded-full transition-all"
-                    style={{ width: `${Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100)}%` }}
-                  />
-                </div>
-              )}
-
-              {/* Subtask list */}
-              <div className="space-y-1.5">
-                {subtasks.map(s => (
-                  <div key={s.id} className="flex items-center gap-2 group">
-                    <button
-                      type="button"
-                      role="checkbox"
-                      aria-checked={s.completed}
-                      aria-label={`${s.title}, subtask`}
-                      onClick={() => onToggleSubtask && onToggleSubtask(s.id, !s.completed)}
-                      className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
-                        s.completed ? 'bg-primary border-primary' : 'border-border hover:border-primary/50'
-                      }`}
-                    >
-                      {s.completed && <span className="text-primary-foreground text-[10px] leading-none">✓</span>}
-                    </button>
-                    <span className={`flex-1 text-sm ${s.completed ? 'line-through text-muted-foreground' : ''}`}>
-                      {s.title}
-                    </span>
-                    <button
-                      type="button"
-                      aria-label={`Delete subtask: ${s.title}`}
-                      onClick={() => onDeleteSubtask && onDeleteSubtask(s.id)}
-                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all text-xs"
-                    >
-                      ×
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              {/* Add subtask input */}
-              {onCreateSubtask && <AddSubtaskInput onAdd={onCreateSubtask} />}
-            </div>
-          )}
-
-          {/* Labels */}
+          {/* T2-3: Labels first (before subtasks) — horizontal compact chips */}
           {(onAddLabel || onRemoveLabel || onCreateLabel) && (
             <div>
               <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider mb-2">Labels</p>
-              {/* Current labels on task */}
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {(task.labels ?? []).map(l => (
                   <LabelPill key={l.id} name={l.name} color={l.color} onRemove={onRemoveLabel ? () => onRemoveLabel(l.id) : undefined} />
                 ))}
-              </div>
-              {/* Available labels to add */}
-              <div className="flex flex-wrap gap-1.5">
                 {labels.filter(l => !(task.labels ?? []).find(tl => tl.id === l.id)).map(l => (
                   <button
                     key={l.id}
@@ -466,42 +413,118 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                   </button>
                 ))}
               </div>
-              {/* Create new label inline */}
               {onCreateLabel && <NewLabelForm onCreateLabel={onCreateLabel} />}
             </div>
           )}
 
-          {/* Dependencies */}
+          {/* T2-3: Subtasks — collapsible, open if has subtasks */}
+          {(onCreateSubtask || onToggleSubtask || onDeleteSubtask) && (
+            <div>
+              <button
+                type="button"
+                onClick={() => setSubtasksOpen(v => !v)}
+                className="flex items-center gap-2 w-full text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider hover:text-foreground transition-colors mb-2"
+              >
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', subtasksOpen && 'rotate-180')} aria-hidden="true" />
+                Checklist
+                {subtasks.length > 0 && (
+                  <span className="normal-case tracking-normal font-normal text-muted-foreground/60">
+                    ({subtasks.filter(s => s.completed).length}/{subtasks.length})
+                  </span>
+                )}
+              </button>
+              {subtasksOpen && (
+                <>
+                  {subtasks.length > 0 && (
+                    <div className="w-full h-1.5 bg-muted rounded-full mb-3 overflow-hidden">
+                      <div
+                        className="h-full bg-primary rounded-full transition-all"
+                        style={{ width: `${Math.round((subtasks.filter(s => s.completed).length / subtasks.length) * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                  <div className="space-y-1.5">
+                    {subtasks.map(s => (
+                      <div key={s.id} className="flex items-center gap-2 group">
+                        <button
+                          type="button"
+                          role="checkbox"
+                          aria-checked={s.completed}
+                          aria-label={`${s.title}, subtask`}
+                          onClick={() => onToggleSubtask && onToggleSubtask(s.id, !s.completed)}
+                          className={`w-4 h-4 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                            s.completed ? 'bg-primary border-primary' : 'border-border hover:border-primary/50'
+                          }`}
+                        >
+                          {s.completed && <span className="text-primary-foreground text-xs leading-none">✓</span>}
+                        </button>
+                        <span className={`flex-1 text-sm ${s.completed ? 'line-through text-muted-foreground' : ''}`}>
+                          {s.title}
+                        </span>
+                        <button
+                          type="button"
+                          aria-label={`Delete subtask: ${s.title}`}
+                          onClick={() => onDeleteSubtask && onDeleteSubtask(s.id)}
+                          className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-all text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {onCreateSubtask && <AddSubtaskInput onAdd={onCreateSubtask} />}
+                </>
+              )}
+            </div>
+          )}
+
+          {/* T2-3: Blockers — collapsible, closed by default */}
           {(onAddDependency || onRemoveDependency) && (
             <div>
-              <p className="text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider mb-2">Blocked by</p>
-              <div className="flex flex-wrap gap-1.5 mb-2">
-                {(task.blockedBy ?? []).map(dep => (
-                  <span key={dep.id} className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full">
-                    🔒 {dep.blocker.title}
-                    {onRemoveDependency && (
-                      <button type="button" onClick={() => onRemoveDependency(dep.blockerId)} className="hover:text-red-300 ml-0.5">×</button>
-                    )}
+              <button
+                type="button"
+                onClick={() => setBlockersOpen(v => !v)}
+                className="flex items-center gap-2 w-full text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider hover:text-foreground transition-colors mb-2"
+              >
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', blockersOpen && 'rotate-180')} aria-hidden="true" />
+                Blocked by
+                {(task.blockedBy ?? []).length > 0 && (
+                  <span className="badge-blocked text-xs px-1.5 py-0.5 rounded-full normal-case tracking-normal font-normal">
+                    {(task.blockedBy ?? []).length}
                   </span>
-                ))}
-              </div>
-              {onAddDependency && (allTasks ?? []).filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id)).length > 0 && (
-                <select
-                  defaultValue=""
-                  onChange={async e => {
-                    if (!e.target.value) return;
-                    const result = await onAddDependency(parseInt(e.target.value)) as { error?: string | null } | void;
-                    if (result?.error) { setSaveError(result.error); return; }
-                    e.target.value = '';
-                  }}
-                  className="w-full px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-                >
-                  <option value="">+ Add blocker…</option>
-                  {(allTasks ?? [])
-                    .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
-                    .map(t => <option key={t.id} value={t.id}>{t.title}</option>)
-                  }
-                </select>
+                )}
+              </button>
+              {blockersOpen && (
+                <>
+                  <div className="flex flex-wrap gap-1.5 mb-2">
+                    {(task.blockedBy ?? []).map(dep => (
+                      <span key={dep.id} className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full">
+                        🔒 {dep.blocker.title}
+                        {onRemoveDependency && (
+                          <button type="button" onClick={() => onRemoveDependency(dep.blockerId)} className="hover:opacity-70 ml-0.5">×</button>
+                        )}
+                      </span>
+                    ))}
+                  </div>
+                  {onAddDependency && (allTasks ?? []).filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id)).length > 0 && (
+                    <select
+                      defaultValue=""
+                      onChange={async e => {
+                        if (!e.target.value) return;
+                        const result = await onAddDependency(parseInt(e.target.value)) as { error?: string | null } | void;
+                        if (result?.error) { setSaveError(result.error); return; }
+                        e.target.value = '';
+                      }}
+                      className="w-full px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                    >
+                      <option value="">+ Add blocker…</option>
+                      {(allTasks ?? [])
+                        .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
+                        .map(t => <option key={t.id} value={t.id}>{t.title}</option>)
+                      }
+                    </select>
+                  )}
+                </>
               )}
             </div>
           )}
@@ -514,7 +537,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 onClick={() => setActivityOpen(v => !v)}
                 className="flex items-center gap-2 w-full text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider hover:text-foreground transition-colors mb-2"
               >
-                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', activityOpen && 'rotate-180')} />
+                <ChevronDown className={cn('w-3.5 h-3.5 transition-transform', activityOpen && 'rotate-180')} aria-hidden="true" />
                 Activity ({activity.length})
               </button>
               {activityOpen && (
@@ -546,19 +569,19 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 {comments.map(c => (
                   <div key={c.id} className="flex gap-2 group">
                     <div className="w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center shrink-0 mt-0.5">
-                      <span className="text-[10px] font-semibold text-primary">U</span>
+                      <span className="text-xs font-semibold text-primary">U</span>
                     </div>
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-foreground/90 break-words">{c.text}</p>
                       <div className="flex items-center gap-2 mt-1">
-                        <span className="text-[10px] text-muted-foreground/60">
+                        <span className="text-xs text-muted-foreground/60">
                           {timeAgo(c.createdAt)}
                         </span>
                         {onDeleteComment && (
                           <button
                             type="button"
                             onClick={() => onDeleteComment(c.id)}
-                            className="text-[10px] text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
+                            className="text-xs text-muted-foreground/40 hover:text-destructive opacity-0 group-hover:opacity-100 transition-all"
                           >
                             delete
                           </button>

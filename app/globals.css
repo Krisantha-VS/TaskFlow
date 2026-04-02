@@ -25,6 +25,8 @@
   --info-muted: hsl(210 85% 94%);
   --overdue: hsl(0 80% 58%);
   --overdue-muted: hsl(0 80% 95%);
+  --priority-low: hsl(142 72% 40%);
+  --priority-low-muted: hsl(142 60% 94%);
 }
 
 .dark {
@@ -35,7 +37,7 @@
   --secondary: hsl(258 22% 16%);
   --secondary-foreground: hsl(258 15% 85%);
   --muted: hsl(245 15% 20%);
-  --muted-foreground: hsl(245 12% 58%);
+  --muted-foreground: hsl(245 12% 62%);
   --accent: hsl(258 28% 24%);
   --accent-foreground: hsl(258 70% 82%);
   --destructive: hsl(0 62% 50%);
@@ -52,6 +54,8 @@
   --info-muted: hsl(210 75% 11%);
   --overdue: hsl(0 80% 62%);
   --overdue-muted: hsl(0 70% 11%);
+  --priority-low: hsl(142 72% 55%);
+  --priority-low-muted: hsl(142 50% 10%);
 }
 
 @theme inline {
@@ -139,3 +143,10 @@ body {
 .dark .label-pink   { color: hsl(330 81% 78%); background-color: hsl(330 81% 60% / 0.22); border-color: hsl(330 81% 60% / 0.38); }
 .dark .label-orange { color: hsl(25 95% 70%);  background-color: hsl(25 95% 53% / 0.22);  border-color: hsl(25 95% 53% / 0.38); }
 .dark .label-gray   { color: hsl(215 16% 68%); background-color: hsl(220 9% 46% / 0.22);  border-color: hsl(220 9% 46% / 0.38); }
+
+/* ─── Button speed + utilities (T2-8) ────────────────── */
+button { transition-duration: 100ms; }
+.btn-primary   { background: var(--primary); color: var(--primary-foreground); }
+.btn-primary:hover { opacity: 0.9; }
+.btn-secondary { background: var(--muted); color: var(--foreground); }
+.btn-secondary:hover { opacity: 0.8; }

@@ -1,18 +1,22 @@
 'use client';
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { DndContext, DragEndEvent, DragStartEvent, DragOverlay, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { useReducedMotion } from '@/lib/useMotion';
-import { Search, X, Columns, Download, BarChart2, Users } from 'lucide-react';
+import { Search, X, Columns, Download, BarChart2, Users, Kanban, Flag, GitBranch, Trash2 } from 'lucide-react';
 import { DEFAULT_COLUMNS, type Board, type BoardColumn, type Task, type TaskStatus, type TaskPriority } from '../types';
 import { KanbanColumn } from './kanban-column';
+import { TaskCard } from './task-card';
 import { TaskEditModal } from './task-edit-modal';
 import { useTasks } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ColumnEditor } from '@/components/column-editor';
 import { AnalyticsPanel } from './analytics-panel';
-import { SprintSelector } from './sprint-selector';
 import { MembersPanel } from './members-panel';
+import { SprintsPanel } from './sprints-panel';
+import { DependenciesPanel } from './dependencies-panel';
+import { TrashPanel } from './trash-panel';
 
 type SortKey = 'default' | 'priority' | 'due_date' | 'created';
 
@@ -61,12 +65,35 @@ let _toastId = 0;
 export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   const reduceMotion = useReducedMotion();
   const toastDuration = reduceMotion ? 0 : 0.15;
-  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, createSprint, deleteSprint } = useTasks(token, boardId);
+  const { tasks, labels, loading, error, createTask, updateTask, moveTask, deleteTask, addTaskLabel, removeTaskLabel, createLabel, fetchLabels, addDependency, removeDependency, activity, activityLoading, fetchActivity, subtasks, fetchSubtasks, fetchModalData, createSubtask, toggleSubtask, deleteSubtask, comments, fetchComments, addComment, deleteComment, sprints, createSprint, deleteSprint } = useTasks(token, boardId);
   const [draggingTask, setDraggingTask]   = useState<Task | null>(null);
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const lastFocusRef = useRef<HTMLElement | null>(null);
-  // Derive live task from tasks array so modal always reflects latest state
   const editingTask = editingTaskId != null ? (tasks.find(t => t.id === editingTaskId) ?? null) : null;
+
+  // @dnd-kit sensors (T2-1)
+  const sensors = useSensors(
+    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(TouchSensor, { activationConstraint: { delay: 200, tolerance: 5 } }),
+  );
+
+  const handleDragStart = (event: DragStartEvent) => {
+    const task = tasks.find(t => t.id === Number(event.active.id));
+    setDraggingTask(task ?? null);
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    setDraggingTask(null);
+    if (!over) return;
+    const targetStatus = String(over.id);
+    if (!isTaskStatus(targetStatus)) return;
+    const taskId = Number(active.id);
+    const task = tasks.find(t => t.id === taskId);
+    if (!task || task.status === targetStatus) return;
+    const { error } = await moveTask(taskId, targetStatus);
+    if (error) addToast(error, 'error');
+  };
 
   // Column editor state
   const [editingColumns, setEditingColumns] = useState(false);
@@ -76,6 +103,15 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
 
   // Members panel state
   const [showMembers, setShowMembers] = useState(false);
+
+  // Sprints panel state (T3-5)
+  const [showSprints, setShowSprints] = useState(false);
+
+  // Dependencies panel state (T3-2)
+  const [showDeps, setShowDeps] = useState(false);
+
+  // Trash panel state (T3-3)
+  const [showTrash, setShowTrash] = useState(false);
 
   // Sprint filter state
   const [activeSprint, setActiveSprint] = useState<number | 'backlog' | null>(null);
@@ -161,8 +197,32 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
   // Bulk delete confirmation state
   const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
-  // Undo toast state
+  // Undo state (T2-9)
   const [undoToast, setUndoToast] = useState<string | null>(null);
+  const [deletedTaskForUndo, setDeletedTaskForUndo] = useState<Task | null>(null);
+  const undoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // URL param sync for filters (T2-10)
+  const [urlInitialized, setUrlInitialized] = useState(false);
+  useEffect(() => {
+    if (urlInitialized) return;
+    const params = new URLSearchParams(window.location.search);
+    const sprint = params.get('sprint');
+    if (sprint === 'backlog') setActiveSprint('backlog');
+    else if (sprint) setActiveSprint(Number(sprint));
+    const lbs = params.get('labels');
+    if (lbs) setLabelFilter(new Set(lbs.split(',').map(Number).filter(Boolean)));
+    setUrlInitialized(true);
+  }, [urlInitialized]);
+
+  useEffect(() => {
+    if (!urlInitialized) return;
+    const params = new URLSearchParams();
+    if (activeSprint !== null) params.set('sprint', String(activeSprint));
+    if (labelFilter.size > 0) params.set('labels', [...labelFilter].join(','));
+    const qs = params.toString();
+    window.history.replaceState({}, '', qs ? `?${qs}` : window.location.pathname);
+  }, [activeSprint, labelFilter, urlInitialized]);
 
   // Fix K5: toast state
   const [toasts, setToasts] = useState<Toast[]>([]);
@@ -175,54 +235,42 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
     }, 3000);
   };
 
-  const handleDragStart = (e: React.DragEvent, task: Task) => {
-    setDraggingTask(task);
-    e.dataTransfer.effectAllowed = 'move';
-  };
-
-  // Fix K1: clear dragging state when drag ends (ghost state fix)
-  const handleDragEnd = () => {
-    setDraggingTask(null);
-  };
-
-  const handleDrop = async (status: TaskStatus) => {
-    if (!draggingTask || draggingTask.status === status) return;
-    const moving = draggingTask;
-    setDraggingTask(null);
-    const { error } = await moveTask(moving.id, status);
-    if (error) addToast(error, 'error');
-    // no success toast for move — it's visually self-evident
-  };
-
-  // Fix K5: wrapped createTask with feedback
   const handleAddTask = async (title: string, priority: Task['priority'], description: string) => {
-    try {
-      await createTask(title, priority, description);
-      addToast('Task created', 'success');
-    } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Failed to create task', 'error');
-    }
+    const { error } = await createTask(title, priority, description);
+    if (error) addToast(error, 'error');
+    else addToast('Task created', 'success');
   };
 
-  // Request delete confirmation instead of deleting directly
   const handleDeleteRequest = (id: number, title: string) => {
     setConfirmTask({ id, title });
   };
 
-  // Confirmed delete with undo toast
+  // T2-9: confirmed delete with actionable undo
   const handleDeleteConfirmed = async () => {
     if (!confirmTask) return;
-    const { id } = confirmTask;
+    const taskToUndo = tasks.find(t => t.id === confirmTask.id) ?? null;
     setConfirmTask(null);
-    try {
-      await deleteTask(id);
-      // Show undo toast
-      setUndoToast('Task deleted');
-      setTimeout(() => setUndoToast(null), 3000);
-    } catch (e) {
-      addToast(e instanceof Error ? e.message : 'Failed to delete task', 'error');
-    }
+    const { error } = await deleteTask(confirmTask.id);
+    if (error) { addToast(error, 'error'); return; }
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setDeletedTaskForUndo(taskToUndo);
+    setUndoToast('Task deleted');
+    undoTimerRef.current = setTimeout(() => {
+      setUndoToast(null);
+      setDeletedTaskForUndo(null);
+    }, 30000);
   };
+
+  const handleUndo = useCallback(async () => {
+    if (!deletedTaskForUndo) return;
+    if (undoTimerRef.current) clearTimeout(undoTimerRef.current);
+    setUndoToast(null);
+    const task = deletedTaskForUndo;
+    setDeletedTaskForUndo(null);
+    const { error } = await createTask(task.title, task.priority, task.description ?? '');
+    if (error) addToast('Could not restore task', 'error');
+    else addToast('Task restored', 'success');
+  }, [deletedTaskForUndo, createTask]);
 
   // Confirmed bulk delete with allSettled feedback
   const handleBulkDeleteConfirmed = async () => {
@@ -256,10 +304,22 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
     ? sprintFiltered
     : sprintFiltered.filter(t => t.labels?.some(l => labelFilter.has(l.id)));
 
+  // T3-6: Skeleton loader instead of spinner
   if (loading) return (
-    <div className="flex items-center justify-center py-24 text-muted-foreground">
-      <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin mr-3" />
-      Loading tasks...
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-4 animate-pulse">
+      {[1, 2, 3].map(i => (
+        <div key={i} className="rounded-xl border border-border bg-muted/20 min-h-[200px]">
+          <div className="px-4 py-3 border-b border-border flex items-center gap-2">
+            <div className="h-4 w-20 bg-muted rounded" />
+            <div className="h-4 w-6 bg-muted rounded-full" />
+          </div>
+          <div className="p-3 space-y-2">
+            {[1, 2, 3].map(j => (
+              <div key={j} className="h-16 bg-muted/50 rounded-xl" />
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   );
 
@@ -272,8 +332,11 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
       {/* Search bar + Sort control */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         <div className="relative w-full max-w-sm">
-          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" />
+          <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground/50 pointer-events-none" aria-hidden="true" />
+          <label htmlFor="task-search" className="sr-only">Search tasks</label>
           <input
+            id="task-search"
+            aria-label="Search tasks"
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search tasks..."
@@ -331,6 +394,33 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           >
             <Users className="w-3.5 h-3.5" />
             <span className="hidden sm:inline">Members</span>
+          </button>
+
+          <button
+            onClick={() => setShowSprints(true)}
+            aria-label="Sprints"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Flag className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Sprints</span>
+          </button>
+
+          <button
+            onClick={() => setShowDeps(true)}
+            aria-label="Dependencies"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <GitBranch className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Deps</span>
+          </button>
+
+          <button
+            onClick={() => setShowTrash(true)}
+            aria-label="Trash"
+            className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">Trash</span>
           </button>
 
           <div className="relative" ref={exportRef}>
@@ -404,13 +494,25 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         </div>
       )}
 
-      <SprintSelector
-        sprints={sprints}
-        activeSprint={activeSprint}
-        onSelect={setActiveSprint}
-        onCreateSprint={async (name, start, end) => createSprint(name, start, end)}
-        onDeleteSprint={async (id) => deleteSprint(id)}
-      />
+      {/* T3-5: Active sprint chip — full management in SprintsPanel */}
+      {activeSprint !== null && (
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-xs text-muted-foreground">Sprint:</span>
+          <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-primary/10 border border-primary/30 text-primary font-medium">
+            <Flag className="w-3 h-3" aria-hidden="true" />
+            {activeSprint === 'backlog'
+              ? 'Backlog'
+              : (sprints.find(s => s.id === activeSprint)?.name ?? `Sprint ${activeSprint}`)}
+            <button
+              onClick={() => setActiveSprint(null)}
+              aria-label="Clear sprint filter"
+              className="ml-0.5 opacity-60 hover:opacity-100 transition-opacity"
+            >
+              <X className="w-3 h-3" aria-hidden="true" />
+            </button>
+          </span>
+        </div>
+      )}
 
       {/* Bulk action bar */}
       {selected.size > 0 && (
@@ -478,36 +580,65 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
-        {columns.map(col => (
-          <KanbanColumn
-            key={col.key}
-            status={isTaskStatus(col.key) ? col.key : 'todo'}
-            label={col.label}
-            colorClass={col.color ?? ''}
-            tasks={sortTasks(labelFiltered.filter(t => t.status === col.key), sortKey)}
-            onDrop={handleDrop}
-            onDragStart={handleDragStart}
-            onDragEnd={handleDragEnd} // Fix K1
-            draggingId={draggingTask?.id ?? null}
-            onDelete={(id) => {
-              const task = tasks.find(t => t.id === id);
-              handleDeleteRequest(id, task?.title ?? 'this task');
-            }}
-            onStatusChange={moveTask}
-            onAddTask={handleAddTask} // Fix K5
-            onEdit={task => { lastFocusRef.current = document.activeElement as HTMLElement; setEditingTaskId(task.id); fetchActivity(task.id); fetchSubtasks(task.id); fetchComments(task.id); }}
-            selected={selected}
-            onToggleSelect={toggleSelect}
-            onSelectAll={(ids) => setSelected(prev => new Set([...prev, ...ids]))}
-          />
-        ))}
-      </div>
+      {/* T2-1: DndContext wrapping columns */}
+      <DndContext
+        sensors={sensors}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+      >
+        <div className="grid grid-cols-1 md:grid-cols-3 xl:grid-cols-[repeat(auto-fit,minmax(260px,1fr))] gap-4">
+          {columns.map(col => (
+            <KanbanColumn
+              key={col.key}
+              status={isTaskStatus(col.key) ? col.key : 'todo'}
+              label={col.label}
+              colorClass={col.color ?? ''}
+              tasks={sortTasks(labelFiltered.filter(t => t.status === col.key), sortKey)}
+              onDelete={(id) => {
+                const task = tasks.find(t => t.id === id);
+                handleDeleteRequest(id, task?.title ?? 'this task');
+              }}
+              onStatusChange={moveTask}
+              onAddTask={handleAddTask}
+              onEdit={task => {
+                lastFocusRef.current = document.activeElement as HTMLElement;
+                setEditingTaskId(task.id);
+                fetchLabels();
+                fetchModalData(task.id);
+              }}
+              selected={selected}
+              onToggleSelect={toggleSelect}
+              onSelectAll={(ids) => setSelected(prev => new Set([...prev, ...ids]))}
+            />
+          ))}
+        </div>
 
-      {/* Empty board state */}
-      {tasks.length === 0 && (
-        <div className="flex items-center justify-center py-10 text-muted-foreground/50 text-sm">
-          No tasks yet. Create one in any column above.
+        {/* T2-7: DragOverlay for spring-feel ghost card */}
+        <DragOverlay dropAnimation={reduceMotion ? null : undefined}>
+          {draggingTask ? (
+            <div className="rotate-1 opacity-95">
+              <TaskCard
+                task={draggingTask}
+                onDelete={() => {}}
+                onStatusChange={() => {}}
+                onEdit={() => {}}
+                isDragOverlay
+              />
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
+
+      {/* T3-4: Empty board onboarding */}
+      {tasks.length === 0 && !loading && (
+        <div className="mt-6 flex flex-col items-center text-center gap-3">
+          <div className="w-14 h-14 rounded-2xl bg-primary/10 flex items-center justify-center">
+            <Kanban className="w-7 h-7 text-primary" aria-hidden="true" />
+          </div>
+          <h3 className="text-base font-semibold">This board is empty</h3>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Each <strong>column</strong> holds <strong>tasks</strong> — click <strong>+ Add task</strong> under any column to get started.
+          </p>
         </div>
       )}
 
@@ -546,6 +677,30 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         <MembersPanel token={token} boardId={boardId} onClose={() => setShowMembers(false)} />
       )}
 
+      {showSprints && (
+        <SprintsPanel
+          sprints={sprints}
+          activeSprint={activeSprint}
+          onSelect={setActiveSprint}
+          onCreateSprint={async (name, start, end) => createSprint(name, start, end)}
+          onDeleteSprint={async (id) => { await deleteSprint(id); }}
+          onClose={() => setShowSprints(false)}
+        />
+      )}
+
+      {showDeps && (
+        <DependenciesPanel tasks={tasks} onClose={() => setShowDeps(false)} />
+      )}
+
+      {showTrash && (
+        <TrashPanel
+          token={token}
+          boardId={boardId}
+          onClose={() => setShowTrash(false)}
+          onRestored={() => { /* tasks will refresh on next poll / re-fetch */ }}
+        />
+      )}
+
       {/* Task delete confirmation dialog */}
       <ConfirmDialog
         open={!!confirmTask}
@@ -565,7 +720,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
         onCancel={() => setConfirmBulkDelete(false)}
       />
 
-      {/* Undo toast */}
+      {/* T2-9: Undo toast with actionable button */}
       <AnimatePresence>
         {undoToast && (
           <motion.div
@@ -576,9 +731,17 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             role="status"
             aria-live="assertive"
             aria-atomic="true"
-            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-2.5 rounded-full text-sm font-medium shadow-lg flex items-center gap-2"
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 bg-foreground text-background px-4 py-2.5 rounded-full text-sm font-medium shadow-lg flex items-center gap-3"
           >
-            {undoToast}
+            <span>{undoToast}</span>
+            {deletedTaskForUndo && (
+              <button
+                onClick={handleUndo}
+                className="text-primary-foreground/80 hover:text-primary-foreground underline text-sm font-semibold"
+              >
+                Undo
+              </button>
+            )}
           </motion.div>
         )}
       </AnimatePresence>

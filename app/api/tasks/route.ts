@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
     const board = await db.board.findFirst({ where: { id: boardId, userId } });
     if (!board) return fail('Board not found', 404);
     const tasks = await db.task.findMany({
-      where: { boardId },
+      where: { boardId, deletedAt: null },
       include: { labels: true, subtasks: { orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] }, blockedBy: { include: { blocker: { select: { id: true, title: true } } } } },
       orderBy: [{ status: 'asc' }, { position: 'asc' }, { createdAt: 'asc' }],
     });
