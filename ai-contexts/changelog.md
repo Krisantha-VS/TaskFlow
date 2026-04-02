@@ -4,6 +4,28 @@
 
 ---
 
+## 2026-04-02 (Session 5) — PLAN-005 all 29 tasks complete
+
+**Commits:** `ed45e41` (Tier 1) · `28b0042` (Tiers 2 & 3) — pushed to `origin/master`
+
+**What changed:**
+- @dnd-kit/core replaces HTML5 DnD (touch support, a11y, spring DragOverlay)
+- Soft-delete with Trash panel + restore API (`Task.deletedAt`, `prisma db push`)
+- Sprints panel (slide-over, full CRUD) replaces inline SprintSelector
+- Dependencies panel showing all board-wide blocking relationships
+- AnimatePresence animations on confirm-dialog + task-edit-modal (reduced-motion safe)
+- `useReducedMotion()` hook; `.label-*` + `.badge-blocked` CSS classes
+- WCAG: aria-hidden on decorative icons, skip-nav link, sr-only labels, error-boundary role=alert
+- Undo toast (30s actionable); URL filter sync via replaceState; export menu keyboard nav
+- Skeleton loaders; empty board onboarding; text-[10px]→text-xs throughout
+
+**Key fixes:**
+- JSX comment inside conditional expression parse error (removed from task-card)
+- `deletedAt: null` filter added to GET /api/tasks to exclude trash from board view
+- DragOverlay uses `disabled: !!isDragOverlay` to prevent duplicate draggable registration
+
+---
+
 ## 2026-04-01 (Session 4)
 
 **Commit:** `9f49867` — pushed to remote, Vercel deploying

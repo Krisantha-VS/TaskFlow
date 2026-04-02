@@ -22,7 +22,7 @@
 | F5 | Real-time sync (SSE / WebSocket) | ✅ done |
 | F6 | Board sharing (invite by email, roles) | ✅ done |
 
-**Progress: 14 / 14 features — 100% ✅** | Last audit: 2026-04-01 (ORG-001 audit + ORG-003 fix sprint — 30 issues resolved, pushed `9f49867`)
+**Progress: 14 / 14 features — 100% ✅** | Last audit: 2026-04-02 (PLAN-005 all 29 tasks — Tier 1 ✅ Tier 2 ✅ Tier 3 ✅, pushed `28b0042`)
 
 ---
 
@@ -91,6 +91,46 @@
 
 **Tier 3 commit:** `24867e8` — task expand animation, spring drag, sprint badge, mobile toolbar
 **Next:** Push to production — `git push` then `vercel --prod` if auto-deploy doesn't trigger within 2 min
+
+---
+
+## Session 2026-04-02 — PLAN-005 UI/UX & Functionality Improvements (all 29 tasks)
+
+**Commits:** `ed45e41` (Tier 1) · `28b0042` (Tiers 2 & 3) — pushed to remote
+
+### Tier 1 — Accessibility blockers + motion foundation
+- `lib/useMotion.ts` (new): `useReducedMotion()` hook using matchMedia
+- `confirm-dialog.tsx`: AnimatePresence entrance/exit (scale + opacity), respects reduced motion
+- `task-edit-modal.tsx`: AnimatePresence backdrop + panel animation, modal opens/closes with motion
+- `globals.css`: `.badge-blocked` CSS class; `.label-*` utility classes; `--priority-low` vars; WCAG muted-foreground contrast fix; `button { transition-duration: 100ms }; .btn-primary/.btn-secondary`
+- `label-pill.tsx`: CSS utility class names instead of Tailwind arbitrary; `text-xs` fixes
+- `error-boundary.tsx`: `role=alert` + `aria-live=assertive`
+- `column-editor.tsx`: `<label htmlFor>` + `aria-label` for delete buttons
+- Export menu: auto-focus first item, ArrowUp/Down keyboard nav
+
+### Tier 2 — DnD + UX Polish
+- **@dnd-kit/core**: `kanban-board.tsx` uses DndContext + DragOverlay; `kanban-column.tsx` uses useDroppable; `task-card.tsx` uses useDraggable on grip handle only
+- Touch support: PointerSensor (8px threshold) + TouchSensor (200ms delay)
+- DragOverlay ghost: rotate-1 + 0.95 opacity; layout-animated card exit/enter
+- Checkbox + select-all always visible; Cmd/Ctrl+Click multi-select
+- Collapsible Subtasks + Blockers in task-edit-modal
+- Blocked badge: shows blocker title + overflow count
+- `text-[10px]` → `text-xs` throughout; task title `font-semibold`
+- Undo toast (30s) with actionable Undo button
+- URL param sync: `?sprint=&labels=` via `replaceState`
+- `aria-hidden` on all decorative icons; sr-only search label
+
+### Tier 3 — Features
+- Breadcrumb "Dashboard > [Board Name]" in task-manager-app
+- Skip nav link + `<main id="main-content">` landmark
+- **Dependencies panel** (`dependencies-panel.tsx`): board-wide blocker list + warns when blocker unresolved
+- **Sprints panel** (`sprints-panel.tsx`): full create/delete/select; active sprint chip replaces inline SprintSelector
+- **Trash / soft-delete**: `prisma/schema.prisma` + `db push` — `Task.deletedAt`; DELETE sets `deletedAt`; hard-delete via `x-hard-delete: 1` header
+- `GET /api/tasks` filters `deletedAt: null`; `GET /api/boards/[id]/trash` lists soft-deleted; `POST /api/tasks/[id]/restore` clears `deletedAt`
+- **Trash panel** (`trash-panel.tsx`): lists, restores, permanently deletes
+- Toolbar buttons: Flag (Sprints), GitBranch (Deps), Trash2 (Trash)
+- Skeleton column/card loaders; empty board onboarding card
+- Recurrence field renamed "Recurring task" with tooltip
 
 ---
 
