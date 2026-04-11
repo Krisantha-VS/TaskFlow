@@ -96,7 +96,7 @@ function useOAuthAuth() {
 // ─── Auth Gate ────────────────────────────────────────────────────────────────
 
 interface AuthGateProps {
-  login: () => Promise<void>;
+  login: () => void;
   loading: boolean;
 }
 
