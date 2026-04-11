@@ -6,13 +6,12 @@ import { useTheme, type Theme } from '@/components/theme-provider';
 import { KanbanBoard } from './kanban-board';
 import { useBoards } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
-import { AUTH_BASE, AUTH_CLIENT_ID } from '@/shared/config';
 import {
-  storeTokens,
   getAccessToken,
-  getRefreshToken,
   clearTokens,
   refreshAccessToken,
+  initiateOAuthLogin,
+  consumeInitToken,
 } from '../lib/auth-fetch';
 import { cn } from '@/lib/utils';
 
@@ -37,170 +36,71 @@ function getInitials(name: string): string {
     .slice(0, 2);
 }
 
-// ─── Minimal inline auth ──────────────────────────────────
+// ─── OAuth Auth Hook ──────────────────────────────────────────────────────────
 
-function useInlineAuth() {
-  const [token, setToken]                       = useState<string | null>(null);
-  const [loading, setLoading]                   = useState(false);
-  const [error, setError]                       = useState('');
-  const [registrationSuccess, setRegistrationSuccess] = useState(false);
-  // true while a silent refresh is in-flight on mount — prevents dashboard flash
-  const [refreshing, setRefreshing]             = useState(true);
+function useOAuthAuth() {
+  const [token,       setToken]       = useState<string | null>(null);
+  const [loading,     setLoading]     = useState(false);
+  const [initializing, setInitializing] = useState(true);
 
   useEffect(() => {
-    const stored = getAccessToken();
+    const init = async () => {
+      // 1. Pick up token from OAuth callback (_at_init cookie, 30-second window)
+      const initToken = consumeInitToken();
+      if (initToken) {
+        setToken(initToken);
+        setInitializing(false);
+        return;
+      }
 
-    if (stored) {
-      // Check client-side expiry before rendering the dashboard
-      try {
-        const payload = JSON.parse(atob(stored.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-        const exp = payload?.exp ? Number(payload.exp) * 1000 : 0;
-        if (exp > Date.now()) {
-          setToken(stored);
-          setRefreshing(false);
-          return;
-        }
-      } catch { /* malformed token — fall through to refresh */ }
-    }
+      // 2. Existing valid token in sessionStorage
+      const stored = getAccessToken();
+      if (stored) {
+        try {
+          const payload = JSON.parse(atob(stored.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+          if (payload?.exp && payload.exp * 1000 > Date.now()) {
+            setToken(stored);
+            setInitializing(false);
+            return;
+          }
+        } catch { /* malformed — fall through */ }
+      }
 
-    // No valid token — try silent refresh
-    const refresh = getRefreshToken();
-    if (refresh) {
-      refreshAccessToken().then(newToken => {
-        if (newToken) setToken(newToken);
-      }).finally(() => setRefreshing(false));
-    } else {
-      setRefreshing(false);
-    }
+      // 3. Silent refresh via httpOnly cookie
+      const refreshed = await refreshAccessToken();
+      if (refreshed) setToken(refreshed);
+
+      setInitializing(false);
+    };
+
+    init();
+
+    const onExpired = () => setToken(null);
+    window.addEventListener('auth:expired', onExpired);
+    return () => window.removeEventListener('auth:expired', onExpired);
   }, []);
 
-  const login = async (email: string, password: string) => {
-    setLoading(true); setError(''); setRegistrationSuccess(false);
-    try {
-      const res  = await fetch(`${AUTH_BASE}/auth/login`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ clientId: AUTH_CLIENT_ID, email, password }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
-      storeTokens(json.data.tokens.accessToken, json.data.tokens.refreshToken);
-      // Fix A1/A2: setToken here is reactive — no sessionStorage read needed
-      setToken(json.data.tokens.accessToken);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Login failed');
-    } finally { setLoading(false); }
-  };
-
-  const register = async (email: string, password: string, name: string) => {
-    setLoading(true); setError(''); setRegistrationSuccess(false);
-    try {
-      const res  = await fetch(`${AUTH_BASE}/auth/register`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ clientId: AUTH_CLIENT_ID, email, password, name }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error);
-      storeTokens(json.data.tokens.accessToken, json.data.tokens.refreshToken);
-      // Fix M4: signal registration success before setting token
-      setRegistrationSuccess(true);
-      setToken(json.data.tokens.accessToken);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Registration failed');
-    } finally { setLoading(false); }
+  const login = async () => {
+    setLoading(true);
+    await initiateOAuthLogin(); // redirects browser — loading state stays true
   };
 
   const logout = useCallback(() => {
     clearTokens();
     setToken(null);
-    setRegistrationSuccess(false);
   }, []);
 
-  const loginDemo = async () => {
-    const DEMO_EMAIL    = 'demo@taskflow.app';
-    const DEMO_PASSWORD = 'Demo@TaskFlow1';
-    const DEMO_NAME     = 'Demo User';
-    setLoading(true); setError(''); setRegistrationSuccess(false);
-    try {
-      // Try login first; if account doesn't exist yet, register then login
-      let res = await fetch(`${AUTH_BASE}/auth/login`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ clientId: AUTH_CLIENT_ID, email: DEMO_EMAIL, password: DEMO_PASSWORD }),
-      });
-      let json = await res.json();
-      if (!json.success && json.code === 'INVALID_CREDENTIALS') {
-        // Demo account not yet created — register it
-        const regRes = await fetch(`${AUTH_BASE}/auth/register`, {
-          method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ clientId: AUTH_CLIENT_ID, email: DEMO_EMAIL, password: DEMO_PASSWORD, name: DEMO_NAME }),
-        });
-        const regJson = await regRes.json();
-        if (!regJson.success) throw new Error(regJson.error);
-        storeTokens(regJson.data.tokens.accessToken, regJson.data.tokens.refreshToken);
-        setToken(regJson.data.tokens.accessToken);
-        return;
-      }
-      if (!json.success) throw new Error(json.error);
-      storeTokens(json.data.tokens.accessToken, json.data.tokens.refreshToken);
-      setToken(json.data.tokens.accessToken);
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Demo login failed');
-    } finally { setLoading(false); }
-  };
-
-  return { token, loading, error, registrationSuccess, refreshing, login, register, logout, loginDemo };
+  return { token, loading, initializing, login, logout };
 }
 
-// ─── Auth Gate ────────────────────────────────────────────
+// ─── Auth Gate ────────────────────────────────────────────────────────────────
 
-// Fix A1/A2: AuthGate receives auth state as props — no independent useInlineAuth call
 interface AuthGateProps {
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string) => Promise<void>;
-  loginDemo: () => Promise<void>;
+  login: () => Promise<void>;
   loading: boolean;
-  error: string;
-  registrationSuccess: boolean;
 }
 
-function AuthGate({ login, register, loginDemo, loading, error, registrationSuccess }: AuthGateProps) {
-  // Fix M5: extend mode to include 'forgot'
-  const [mode, setMode]           = useState<'login' | 'register' | 'forgot'>('login');
-  const [email, setEmail]         = useState('');
-  const [password, setPass]       = useState('');
-  const [name, setName]           = useState('');
-  const [forgotEmail, setForgotEmail]   = useState('');
-  const [forgotLoading, setForgotLoading] = useState(false);
-  const [forgotError, setForgotError]     = useState('');
-  const [forgotSuccess, setForgotSuccess] = useState(false);
-
-  const submit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (mode === 'login') await login(email, password);
-    else if (mode === 'register') await register(email, password, name);
-  };
-
-  // Fix M5: forgot password handler — calls inline, no external navigation
-  const submitForgot = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setForgotLoading(true); setForgotError(''); setForgotSuccess(false);
-    try {
-      const res  = await fetch(`${AUTH_BASE}/auth/forgot-password`, {
-        method:  'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body:    JSON.stringify({ clientId: AUTH_CLIENT_ID, email: forgotEmail, redirectTo: `${process.env.NEXT_PUBLIC_APP_URL ?? 'https://task-flow.royalda.com'}` }),
-      });
-      const json = await res.json();
-      if (!json.success) throw new Error(json.error ?? 'Request failed');
-      setForgotSuccess(true);
-    } catch (e) {
-      setForgotError(e instanceof Error ? e.message : 'Request failed');
-    } finally {
-      setForgotLoading(false);
-    }
-  };
-
+function AuthGate({ login, loading }: AuthGateProps) {
   return (
     <div className="min-h-[calc(100vh-3rem)] flex items-center justify-center p-6">
       <div className="glass rounded-2xl p-8 w-full max-w-sm border border-border">
@@ -214,113 +114,27 @@ function AuthGate({ login, register, loginDemo, loading, error, registrationSucc
           </div>
         </div>
 
-        {/* Fix M5: forgot password mode */}
-        {mode === 'forgot' ? (
-          <div className="space-y-4">
-            {forgotSuccess ? (
-              <p className="text-sm text-success text-center">Check your inbox for a reset link.</p>
-            ) : (
-              <form onSubmit={submitForgot} className="space-y-4">
-                <input
-                  type="email" value={forgotEmail} onChange={e => setForgotEmail(e.target.value)}
-                  placeholder="Your email address" required
-                  className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm outline-none focus:border-primary transition-colors"
-                />
-                {forgotError && <p className="text-xs text-destructive">{forgotError}</p>}
-                <button
-                  type="submit" disabled={forgotLoading}
-                  className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-                >
-                  {forgotLoading ? 'Sending…' : 'Send reset link'}
-                </button>
-              </form>
-            )}
-            <p className="text-center text-xs text-muted-foreground mt-2">
-              <button
-                onClick={() => { setMode('login'); setForgotEmail(''); setForgotError(''); setForgotSuccess(false); }}
-                className="text-primary hover:underline"
-              >
-                Back to sign in
-              </button>
-            </p>
-          </div>
-        ) : (
-          <form onSubmit={submit} className="space-y-4">
-            {mode === 'register' && (
-              <input
-                value={name} onChange={e => setName(e.target.value)}
-                placeholder="Your name" required
-                className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm outline-none focus:border-primary transition-colors"
-              />
-            )}
-            <input
-              type="email" value={email} onChange={e => setEmail(e.target.value)}
-              placeholder="Email" required
-              className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm outline-none focus:border-primary transition-colors"
-            />
-            <input
-              type="password" value={password} onChange={e => setPass(e.target.value)}
-              placeholder="Password" required minLength={8}
-              className="w-full px-4 py-2.5 rounded-lg bg-background border border-border text-sm outline-none focus:border-primary transition-colors"
-            />
-            {/* Fix M4: registration success inline message */}
-            {registrationSuccess && (
-              <p className="text-xs text-success">Account created — signing you in…</p>
-            )}
-            {error && <p className="text-xs text-destructive">{error}</p>}
-            <button
-              type="submit" disabled={loading}
-              className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium hover:opacity-90 transition-opacity disabled:opacity-50"
-            >
-              {loading ? 'Please wait…' : mode === 'login' ? 'Sign in' : 'Create account'}
-            </button>
-            {/* Fix M5: forgot password now toggles inline mode, no external navigation */}
-            {mode === 'login' && (
-              <div className="text-center">
-                <button
-                  type="button"
-                  onClick={() => setMode('forgot')}
-                  className="text-xs text-muted-foreground/60 hover:text-muted-foreground transition-colors"
-                >
-                  Forgot password?
-                </button>
-              </div>
-            )}
-          </form>
-        )}
+        <p className="text-sm text-muted-foreground mb-6 text-center">
+          Sign in to access your boards
+        </p>
 
-        {mode !== 'forgot' && (
-          <p className="text-center text-xs text-muted-foreground mt-4">
-            {mode === 'login' ? "Don't have an account? " : 'Already have an account? '}
-            <button
-              onClick={() => setMode(mode === 'login' ? 'register' : 'login')}
-              className="text-primary hover:underline"
-            >
-              {mode === 'login' ? 'Register' : 'Sign in'}
-            </button>
-          </p>
-        )}
-
-        {mode === 'login' && (
-          <>
-            <div className="relative my-1">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-border" />
-              </div>
-              <div className="relative flex justify-center">
-                <span className="px-2 bg-background text-xs text-muted-foreground/50">or</span>
-              </div>
-            </div>
-            <button
-              type="button"
-              disabled={loading}
-              onClick={loginDemo}
-              className="w-full py-2.5 rounded-lg border border-border text-sm text-muted-foreground hover:text-foreground hover:border-primary/50 transition-colors disabled:opacity-50"
-            >
-              Try demo account
-            </button>
-          </>
-        )}
+        <button
+          type="button"
+          disabled={loading}
+          onClick={login}
+          className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium
+                     hover:opacity-90 transition-opacity disabled:opacity-50
+                     flex items-center justify-center gap-2"
+        >
+          {loading ? (
+            <>
+              <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
+              Redirecting…
+            </>
+          ) : (
+            'Sign in'
+          )}
+        </button>
 
         <p className="text-center text-xs text-muted-foreground/50 mt-6">
           Secured by{' '}
@@ -336,8 +150,7 @@ function AuthGate({ login, register, loginDemo, loading, error, registrationSucc
 // ─── Main App ─────────────────────────────────────────────
 
 export function TaskManagerApp() {
-  // Fix A1/A2: single useInlineAuth instance at the top level
-  const { token, loading: authLoading, error: authError, registrationSuccess, refreshing, login, register, logout, loginDemo } = useInlineAuth();
+  const { token, loading: authLoading, initializing, login, logout } = useOAuthAuth();
   const { boards, loading: boardsLoading, error: boardsError, createBoard, deleteBoard, updateBoardColumns } = useBoards(token);
   const [activeBoardId, setActiveBoardId] = useState<number | null>(null);
   const [newBoardName, setNewBoardName]   = useState('');
@@ -362,8 +175,8 @@ export function TaskManagerApp() {
   const userName  = profile?.name  ?? profile?.email?.split('@')[0] ?? 'User';
   const userEmail = profile?.email ?? '';
 
-  // Show neutral spinner while silent refresh is in-flight — no dashboard or login flash
-  if (refreshing) {
+  // Show neutral spinner while init is in-flight — no dashboard or login flash
+  if (initializing) {
     return (
       <div className="min-h-[calc(100vh-3rem)] flex items-center justify-center">
         <div className="w-6 h-6 rounded-full border-2 border-primary border-t-transparent animate-spin" />
@@ -372,16 +185,7 @@ export function TaskManagerApp() {
   }
 
   if (!token) {
-    return (
-      <AuthGate
-        login={login}
-        register={register}
-        loginDemo={loginDemo}
-        loading={authLoading}
-        error={authError}
-        registrationSuccess={registrationSuccess}
-      />
-    );
+    return <AuthGate login={login} loading={authLoading} />;
   }
 
   const activeBoard = boards.find(b => b.id === activeBoardId);

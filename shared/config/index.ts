@@ -4,3 +4,5 @@ export const AUTH_BASE =
 
 export const AUTH_CLIENT_ID =
   process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '';
+
+export const OAUTH_PKCE_METHOD = 'S256' as const;

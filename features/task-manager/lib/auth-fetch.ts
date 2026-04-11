@@ -1,60 +1,81 @@
 import { AUTH_BASE, AUTH_CLIENT_ID } from '@/shared/config';
 
-const TOKEN_KEY   = 'tm_token';
-const REFRESH_KEY = 'tm_refresh';
+const ACCESS_TOKEN_KEY = 'tm_access_token';
 
-// ─── Token storage helpers ────────────────────────────────
+// ─── Token storage ────────────────────────────────────────────────────────────
+// access_token  → sessionStorage (volatile, expires on tab close)
+// refresh_token → httpOnly cookie (set server-side, never readable by JS)
 
-export function storeTokens(accessToken: string, refreshToken: string) {
-  sessionStorage.setItem(TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_KEY, refreshToken);
+export function storeAccessToken(token: string): void {
+  if (typeof window !== 'undefined') {
+    sessionStorage.setItem(ACCESS_TOKEN_KEY, token);
+  }
 }
 
 export function getAccessToken(): string | null {
-  return sessionStorage.getItem(TOKEN_KEY);
+  if (typeof window === 'undefined') return null;
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
-export function getRefreshToken(): string | null {
-  return localStorage.getItem(REFRESH_KEY);
+export function clearTokens(): void {
+  if (typeof window === 'undefined') return;
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  // refresh_token (httpOnly cookie) is cleared server-side via POST /api/auth/logout
 }
 
-export function clearTokens() {
-  sessionStorage.removeItem(TOKEN_KEY);
-  localStorage.removeItem(REFRESH_KEY);
+// ─── Init: consume access token from OAuth callback ──────────────────────────
+// The callback route sets a 30-second readable cookie '_at_init'.
+// Call this once on app mount — reads the token, stores it, then immediately
+// deletes the cookie so it can't be read a second time.
+
+export function consumeInitToken(): string | null {
+  if (typeof window === 'undefined') return null;
+
+  const match = document.cookie.match(/(?:^|;\s*)_at_init=([^;]+)/);
+  if (!match) return null;
+
+  const token = decodeURIComponent(match[1]);
+  // Delete cookie immediately
+  document.cookie = '_at_init=; path=/; max-age=0; SameSite=Lax';
+  storeAccessToken(token);
+  return token;
 }
 
-// ─── Refresh ──────────────────────────────────────────────
-// Singleton: all concurrent callers share one refresh attempt.
-// Prevents race condition with single-use token rotation.
+// ─── Refresh (uses httpOnly cookie, not localStorage) ────────────────────────
 
 let _refreshing: Promise<string | null> | null = null;
 
 async function doRefresh(): Promise<string | null> {
-  const refreshToken = getRefreshToken();
-  if (!refreshToken) return null;
-
   try {
-    const res  = await fetch(`${AUTH_BASE}/auth/refresh`, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body:    JSON.stringify({ refreshToken, clientId: AUTH_CLIENT_ID }),
+    const res = await fetch(`${AUTH_BASE}/auth/refresh`, {
+      method:      'POST',
+      headers:     { 'Content-Type': 'application/json' },
+      credentials: 'include', // sends httpOnly refresh_token cookie automatically
     });
-    const json = await res.json();
 
-    if (!res.ok || !json.success) {
-      window.dispatchEvent(new Event('auth:expired'));
+    if (!res.ok) {
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('auth:expired'));
+      }
       clearTokens();
       return null;
     }
 
-    if (!json.data?.accessToken || !json.data?.refreshToken) {
-      throw new Error('Refresh response missing tokens');
+    const json = await res.json();
+    const newToken: string | undefined =
+      json?.data?.accessToken ?? json?.data?.access_token;
+
+    if (!newToken) {
+      clearTokens();
+      return null;
     }
-    const { accessToken, refreshToken: newRefresh } = json.data;
-    storeTokens(accessToken, newRefresh ?? refreshToken);
-    return accessToken;
+
+    storeAccessToken(newToken);
+    return newToken;
   } catch {
-    window.dispatchEvent(new Event('auth:expired'));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:expired'));
+    }
     clearTokens();
     return null;
   }
@@ -66,8 +87,23 @@ export async function refreshAccessToken(): Promise<string | null> {
   return _refreshing;
 }
 
-// ─── authFetch ────────────────────────────────────────────
-// Wraps fetch with Bearer token injection + a single 401 retry after refresh.
+// ─── Initiate OAuth login ─────────────────────────────────────────────────────
+// Calls /api/auth/login-start (server route that sets httpOnly PKCE cookies),
+// then redirects the browser to AuthSaaS hosted login page.
+
+export async function initiateOAuthLogin(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const res = await fetch('/api/auth/login-start', { method: 'POST' });
+    if (!res.ok) throw new Error('login-start failed');
+    const { authUrl } = await res.json();
+    window.location.href = authUrl;
+  } catch (e) {
+    console.error('[auth] Failed to initiate OAuth login:', e);
+  }
+}
+
+// ─── authFetch ────────────────────────────────────────────────────────────────
 
 export async function authFetch(
   url: string,
@@ -87,7 +123,6 @@ export async function authFetch(
       headers.set('Authorization', `Bearer ${newToken}`);
       return fetch(url, { ...options, headers });
     }
-    // refreshAccessToken already dispatched auth:expired and cleared tokens
   }
 
   return res;
