@@ -63,7 +63,7 @@ export async function GET(req: NextRequest) {
       return fail('token_exchange_failed');
     }
 
-    const { access_token, refresh_token } = tokenData.data;
+    const { refresh_token } = tokenData.data;
 
     // Redirect to app root
     const res = NextResponse.redirect(appRoot);
@@ -72,22 +72,14 @@ export async function GET(req: NextRequest) {
     res.cookies.delete('oauth_state');
     res.cookies.delete('oauth_code_verifier');
 
-    // Refresh token → httpOnly (JS cannot read)
+    // Refresh token → httpOnly cookie on TaskFlow domain.
+    // On page load, /api/auth/refresh proxy reads this and returns a fresh access_token.
     res.cookies.set('refresh_token', refresh_token, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       path:     '/api',
       maxAge:   7 * 24 * 60 * 60,
-    });
-
-    // Access token → short-lived readable cookie (client picks it up on mount, then deletes it)
-    res.cookies.set('_at_init', access_token, {
-      httpOnly: false,
-      secure:   process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
-      path:     '/',
-      maxAge:   30, // 30 seconds — client reads once, then deletes
     });
 
     return res;

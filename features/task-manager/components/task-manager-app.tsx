@@ -11,7 +11,6 @@ import {
   clearTokens,
   refreshAccessToken,
   initiateOAuthLogin,
-  consumeInitToken,
 } from '../lib/auth-fetch';
 import { cn } from '@/lib/utils';
 
@@ -45,15 +44,7 @@ function useOAuthAuth() {
 
   useEffect(() => {
     const init = async () => {
-      // 1. Pick up token from OAuth callback (_at_init cookie, 30-second window)
-      const initToken = consumeInitToken();
-      if (initToken) {
-        setToken(initToken);
-        setInitializing(false);
-        return;
-      }
-
-      // 2. Existing valid token in sessionStorage
+      // 1. Valid token already in sessionStorage
       const stored = getAccessToken();
       if (stored) {
         try {
@@ -66,7 +57,7 @@ function useOAuthAuth() {
         } catch { /* malformed — fall through */ }
       }
 
-      // 3. Silent refresh via httpOnly cookie
+      // 2. Silent refresh via /api/auth/refresh proxy (reads httpOnly cookie server-side)
       const refreshed = await refreshAccessToken();
       if (refreshed) setToken(refreshed);
 
