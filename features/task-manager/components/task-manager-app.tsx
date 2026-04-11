@@ -80,9 +80,9 @@ function useOAuthAuth() {
     return () => window.removeEventListener('auth:expired', onExpired);
   }, []);
 
-  const login = async () => {
+  const login = () => {
     setLoading(true);
-    await initiateOAuthLogin(); // redirects browser — loading state stays true
+    initiateOAuthLogin(); // navigates browser — loading state stays true
   };
 
   const logout = useCallback(() => {

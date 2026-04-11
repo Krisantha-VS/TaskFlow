@@ -13,18 +13,19 @@ function generateState(): string {
   return crypto.randomBytes(32).toString('base64url');
 }
 
-// ─── POST /api/auth/login-start ───────────────────────────────────────────────
-// Generates PKCE params + state server-side, stores them in httpOnly cookies,
-// returns the OAuth authorize URL for the client to redirect to.
+// ─── GET /api/auth/login-start ────────────────────────────────────────────────
+// Browser navigates here directly (window.location.href). Generates PKCE +
+// state server-side, sets httpOnly cookies in the redirect response, then
+// redirects the browser straight to AuthSaaS /oauth/login.
+// Using GET + redirect (not POST + fetch) ensures cookies are always stored
+// before the browser leaves the page.
 
-export async function POST(req: NextRequest) {
+export async function GET(req: NextRequest) {
   const authBase = (process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1')
     .trim()
     .replace(/\/api\/v1\/?$/, '');
-  const clientId = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
-  // Always use the actual request origin so cookies and redirect_uri are on the same domain
-  const appUrl     = req.nextUrl.origin;
-  const redirectUri = `${appUrl}/api/auth/callback`;
+  const clientId    = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
+  const redirectUri = `${req.nextUrl.origin}/api/auth/callback`;
 
   const codeVerifier  = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
@@ -41,14 +42,15 @@ export async function POST(req: NextRequest) {
 
   const authUrl = `${authBase}/oauth/login?${params.toString()}`;
 
-  const res = NextResponse.json({ authUrl });
+  // 302 redirect to AuthSaaS with cookies in the same response
+  const res = NextResponse.redirect(authUrl, { status: 302 });
 
   const cookieOpts = {
     httpOnly: true,
     secure:   process.env.NODE_ENV === 'production',
-    sameSite: 'lax'  as const,
+    sameSite: 'lax' as const,
     path:     '/',
-    maxAge:   300, // 5 minutes
+    maxAge:   300,
   };
 
   res.cookies.set('oauth_state',         state,        cookieOpts);

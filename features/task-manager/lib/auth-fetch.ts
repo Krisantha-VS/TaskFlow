@@ -91,16 +91,10 @@ export async function refreshAccessToken(): Promise<string | null> {
 // Calls /api/auth/login-start (server route that sets httpOnly PKCE cookies),
 // then redirects the browser to AuthSaaS hosted login page.
 
-export async function initiateOAuthLogin(): Promise<void> {
+export function initiateOAuthLogin(): void {
   if (typeof window === 'undefined') return;
-  try {
-    const res = await fetch('/api/auth/login-start', { method: 'POST' });
-    if (!res.ok) throw new Error('login-start failed');
-    const { authUrl } = await res.json();
-    window.location.href = authUrl;
-  } catch (e) {
-    console.error('[auth] Failed to initiate OAuth login:', e);
-  }
+  // Navigate directly — server sets httpOnly cookies + redirects to AuthSaaS in one response
+  window.location.href = '/api/auth/login-start';
 }
 
 // ─── authFetch ────────────────────────────────────────────────────────────────
