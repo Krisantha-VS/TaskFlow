@@ -39,8 +39,8 @@ export async function GET(req: NextRequest) {
   if (!codeVerifier) return fail('missing_verifier');
 
   // Backend-to-backend token exchange
-  const authBase   = process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1';
-  const clientId   = process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '';
+  const authBase   = (process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1').trim();
+  const clientId   = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
   const redirectUri = `${appUrl}/api/auth/callback`;
 
   try {

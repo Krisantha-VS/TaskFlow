@@ -19,10 +19,11 @@ function generateState(): string {
 
 export async function POST(req: NextRequest) {
   const authBase = (process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1')
-    .replace(/\/api\/v1\/?$/, ''); // strip /api/v1 → base origin of AuthSaaS
-  const clientId   = process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '';
+    .trim()
+    .replace(/\/api\/v1\/?$/, '');
+  const clientId   = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
   const origin     = req.headers.get('origin') ?? '';
-  const appUrl     = process.env.NEXT_PUBLIC_APP_URL ?? origin;
+  const appUrl     = (process.env.NEXT_PUBLIC_APP_URL ?? origin).trim();
   const redirectUri = `${appUrl}/api/auth/callback`;
 
   const codeVerifier  = generateCodeVerifier();
