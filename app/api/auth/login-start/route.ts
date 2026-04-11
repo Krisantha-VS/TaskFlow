@@ -21,9 +21,9 @@ export async function POST(req: NextRequest) {
   const authBase = (process.env.NEXT_PUBLIC_AUTH_URL ?? 'https://auth-saas.royalda.com/api/v1')
     .trim()
     .replace(/\/api\/v1\/?$/, '');
-  const clientId   = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
-  const origin     = req.headers.get('origin') ?? '';
-  const appUrl     = (process.env.NEXT_PUBLIC_APP_URL ?? origin).trim();
+  const clientId = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
+  // Always use the actual request origin so cookies and redirect_uri are on the same domain
+  const appUrl     = req.nextUrl.origin;
   const redirectUri = `${appUrl}/api/auth/callback`;
 
   const codeVerifier  = generateCodeVerifier();

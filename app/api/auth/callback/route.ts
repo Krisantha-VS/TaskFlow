@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
   const state = searchParams.get('state');
   const error = searchParams.get('error');
 
-  const appUrl  = (process.env.NEXT_PUBLIC_APP_URL ?? new URL(req.url).origin).trim();
+  const appUrl  = req.nextUrl.origin;
   const appRoot = new URL('/', appUrl);
 
   const cookieStore = await cookies();
