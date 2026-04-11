@@ -47,10 +47,11 @@ let _refreshing: Promise<string | null> | null = null;
 
 async function doRefresh(): Promise<string | null> {
   try {
-    const res = await fetch(`${AUTH_BASE}/auth/refresh`, {
-      method:      'POST',
-      headers:     { 'Content-Type': 'application/json' },
-      credentials: 'include', // sends httpOnly refresh_token cookie automatically
+    // Call TaskFlow's own proxy route — reads httpOnly cookie server-side,
+    // calls AuthSaaS without CORS, rotates cookie, returns new access_token.
+    const res = await fetch('/api/auth/refresh', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
     });
 
     if (!res.ok) {
@@ -62,8 +63,7 @@ async function doRefresh(): Promise<string | null> {
     }
 
     const json = await res.json();
-    const newToken: string | undefined =
-      json?.data?.accessToken ?? json?.data?.access_token;
+    const newToken: string | undefined = json?.data?.accessToken;
 
     if (!newToken) {
       clearTokens();
