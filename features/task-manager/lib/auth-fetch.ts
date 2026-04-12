@@ -20,7 +20,8 @@ export function getAccessToken(): string | null {
 export function clearTokens(): void {
   if (typeof window === 'undefined') return;
   sessionStorage.removeItem(ACCESS_TOKEN_KEY);
-  // refresh_token (httpOnly cookie) is cleared server-side via POST /api/auth/logout
+  // Clear the httpOnly refresh_token cookie server-side (fire-and-forget)
+  fetch('/api/auth/logout', { method: 'POST' }).catch(() => {});
 }
 
 // ─── Init: consume access token from OAuth callback ──────────────────────────
