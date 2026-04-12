@@ -25,7 +25,8 @@ export async function GET(req: NextRequest) {
     .trim()
     .replace(/\/api\/v1\/?$/, '');
   const clientId    = (process.env.NEXT_PUBLIC_AUTH_CLIENT_ID ?? '').trim();
-  const redirectUri = `${req.nextUrl.origin}/api/auth/callback`;
+  const appUrl      = (process.env.NEXT_PUBLIC_APP_URL ?? req.nextUrl.origin).trim();
+  const redirectUri = `${appUrl}/api/auth/callback`;
 
   const codeVerifier  = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
