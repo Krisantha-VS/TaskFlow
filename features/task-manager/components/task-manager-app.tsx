@@ -10,6 +10,7 @@ import {
   getAccessToken,
   clearTokens,
   refreshAccessToken,
+  consumeInitToken,
   initiateOAuthLogin,
 } from '../lib/auth-fetch';
 import { cn } from '@/lib/utils';
@@ -57,7 +58,15 @@ function useOAuthAuth() {
         } catch { /* malformed — fall through */ }
       }
 
-      // 2. Silent refresh via /api/auth/refresh proxy (reads httpOnly cookie server-side)
+      // 2. Consume _at_init cookie set by OAuth callback (present only on first load after login)
+      const initTok = consumeInitToken();
+      if (initTok) {
+        setToken(initTok);
+        setInitializing(false);
+        return;
+      }
+
+      // 3. Silent refresh via /api/auth/refresh proxy (reads httpOnly cookie server-side)
       const refreshed = await refreshAccessToken();
       if (refreshed) setToken(refreshed);
 
