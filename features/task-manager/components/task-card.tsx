@@ -92,7 +92,7 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
       </button>
 
       {/* Header */}
-      <div className="flex items-start gap-2 ml-5">
+      <div className="flex items-start gap-2 ml-7">
         <div className="flex-1 min-w-0">
           {/* T2-4: font-semibold */}
           <p className="text-sm font-semibold leading-snug break-words">{task.title}</p>
@@ -129,7 +129,7 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
 
       {/* Description expand */}
       {task.description && (
-        <div className="mt-2 ml-5">
+        <div className="mt-2 ml-7">
           <button
             onClick={e => { e.stopPropagation(); setExpanded(!expanded); }}
             aria-label={expanded ? 'Collapse task details' : 'Expand task details'}
@@ -158,7 +158,7 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
 
       {/* Labels */}
       {task.labels && task.labels.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1.5 ml-5">
+        <div className="flex flex-wrap gap-1 mt-1.5 ml-7">
           {task.labels.map(l => (
             <LabelPill key={l.id} name={l.name} color={l.color} small />
           ))}
@@ -167,7 +167,7 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
 
       {/* T2-6: Blocked badge with blocker name */}
       {task.blockedBy && task.blockedBy.length > 0 && (
-        <div className="mt-1.5 ml-5">
+        <div className="mt-1.5 ml-7">
           <span className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium">
             🔒 {task.blockedBy[0].blocker.title}
             {task.blockedBy.length > 1 && ` +${task.blockedBy.length - 1}`}
@@ -176,7 +176,7 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
       )}
 
       {/* Footer */}
-      <div className="flex items-center justify-between mt-3 ml-5">
+      <div className="flex items-center justify-between mt-3 ml-7">
         <div className="flex items-center gap-1.5">
           <span className={cn('text-xs px-2 py-0.5 rounded-full font-medium', priority.classes)}>
             {priority.label}
@@ -209,7 +209,7 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
       {/* Mobile "Move to" */}
       {!isDragOverlay && otherStatuses.length > 0 && (
         <div
-          className="md:hidden flex items-center gap-1.5 mt-2 ml-5"
+          className="md:hidden flex items-center gap-1.5 mt-2 ml-7"
           onClick={e => e.stopPropagation()}
         >
           <ChevronRight className="w-3 h-3 text-muted-foreground/50 shrink-0" aria-hidden="true" />
