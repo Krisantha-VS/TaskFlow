@@ -65,16 +65,10 @@ export async function GET(req: NextRequest) {
 
     const { refresh_token } = tokenData.data;
 
-    // Redirect to app root
-    const res = NextResponse.redirect(appRoot);
-
-    // Clear temporary OAuth cookies
-    res.cookies.delete('oauth_state');
-    res.cookies.delete('oauth_code_verifier');
-
-    // Refresh token → httpOnly cookie on TaskFlow domain.
-    // On page load, /api/auth/refresh proxy reads this and returns a fresh access_token.
-    res.cookies.set('refresh_token', refresh_token, {
+    // Set cookies via next/headers — more reliable than setting on a redirect response.
+    cookieStore.delete('oauth_state');
+    cookieStore.delete('oauth_code_verifier');
+    cookieStore.set('refresh_token', refresh_token, {
       httpOnly: true,
       secure:   process.env.NODE_ENV === 'production',
       sameSite: 'lax',
@@ -82,7 +76,7 @@ export async function GET(req: NextRequest) {
       maxAge:   7 * 24 * 60 * 60,
     });
 
-    return res;
+    return NextResponse.redirect(appRoot);
 
   } catch (e) {
     console.error('[oauth/callback] fetch error:', e);

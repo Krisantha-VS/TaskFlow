@@ -92,6 +92,10 @@ interface AuthGateProps {
 }
 
 function AuthGate({ login, loading }: AuthGateProps) {
+  const authError = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search).get('auth_error')
+    : null;
+
   return (
     <div className="min-h-[calc(100vh-3rem)] flex items-center justify-center p-6">
       <div className="glass rounded-2xl p-8 w-full max-w-sm border border-border">
@@ -104,6 +108,12 @@ function AuthGate({ login, loading }: AuthGateProps) {
             <p className="text-xs text-muted-foreground">Kanban task manager</p>
           </div>
         </div>
+
+        {authError && (
+          <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-4 text-center font-mono">
+            {authError}
+          </p>
+        )}
 
         <p className="text-sm text-muted-foreground mb-6 text-center">
           Sign in to access your boards
