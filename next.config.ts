@@ -5,7 +5,7 @@ const AUTH_UPSTREAM = process.env.AUTH_UPSTREAM_URL ?? process.env.NEXT_PUBLIC_A
 const CSP = [
   "default-src 'self'",
   // 'unsafe-inline' for theme-detection script; 'unsafe-eval' for Framer Motion
-  "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
+  "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://static.cloudflareinsights.com",
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
