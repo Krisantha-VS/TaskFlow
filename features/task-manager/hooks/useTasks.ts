@@ -146,7 +146,7 @@ export function useTasks(token: string | null, boardId: number | null) {
   };
 
   // Fix A6: moveTask — optimistic update with rollback on failure
-  const moveTask = async (id: number, status: TaskStatus): Promise<{ error: string | null }> => {
+  const moveTask = async (id: number, status: string): Promise<{ error: string | null }> => {
     if (!token) return { error: 'Not authenticated' };
     setMutationError(null);
 

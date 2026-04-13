@@ -1,4 +1,8 @@
-export type TaskStatus   = 'todo' | 'in_progress' | 'done';
+// Kept as a wide string so custom board columns work as valid statuses.
+// Use DEFAULT_STATUS_KEYS to check for built-in columns.
+export type TaskStatus = string;
+export const DEFAULT_STATUS_KEYS = ['todo', 'in_progress', 'done'] as const;
+export type DefaultStatus = typeof DEFAULT_STATUS_KEYS[number];
 export type TaskPriority = 'low' | 'medium' | 'high';
 
 export interface BoardColumn {

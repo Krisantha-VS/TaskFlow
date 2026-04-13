@@ -20,9 +20,9 @@ import { TrashPanel } from './trash-panel';
 
 type SortKey = 'default' | 'priority' | 'due_date' | 'created';
 
-const VALID_TASK_STATUSES = new Set<string>(['todo', 'in_progress', 'done']);
+// Any non-empty string is a valid status — custom columns use their key as status.
 function isTaskStatus(value: string): value is TaskStatus {
-  return VALID_TASK_STATUSES.has(value);
+  return value.trim().length > 0;
 }
 
 const PRIORITY_ORDER: Record<string, number> = { high: 0, medium: 1, low: 2 };
@@ -590,7 +590,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
           {columns.map(col => (
             <KanbanColumn
               key={col.key}
-              status={isTaskStatus(col.key) ? col.key : 'todo'}
+              status={col.key}
               label={col.label}
               colorClass={col.color ?? ''}
               tasks={sortTasks(labelFiltered.filter(t => t.status === col.key), sortKey)}

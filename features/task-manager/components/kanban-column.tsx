@@ -10,12 +10,12 @@ import { cn } from '@/lib/utils';
 import { useReducedMotion } from '@/lib/useMotion';
 
 interface Props {
-  status: TaskStatus;
+  status: string;
   label: string;
   colorClass: string;
   tasks: Task[];
   onDelete: (id: number) => void;
-  onStatusChange: (id: number, status: TaskStatus) => void;
+  onStatusChange: (id: number, status: string) => void;
   onAddTask: (title: string, priority: Task['priority'], description: string) => void;
   onEdit: (task: Task) => void;
   selected?: Set<number>;
