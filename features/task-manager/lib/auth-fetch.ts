@@ -1,5 +1,3 @@
-import { AUTH_BASE, AUTH_CLIENT_ID } from '@/shared/config';
-
 const ACCESS_TOKEN_KEY = 'tm_access_token';
 
 // ─── Token storage ────────────────────────────────────────────────────────────
@@ -48,36 +46,20 @@ let _refreshing: Promise<string | null> | null = null;
 
 async function doRefresh(): Promise<string | null> {
   try {
-    // Call TaskFlow's own proxy route — reads httpOnly cookie server-side,
-    // calls AuthSaaS without CORS, rotates cookie, returns new access_token.
     const res = await fetch('/api/auth/refresh', {
       method:  'POST',
       headers: { 'Content-Type': 'application/json' },
     });
 
-    if (!res.ok) {
-      if (typeof window !== 'undefined') {
-        window.dispatchEvent(new Event('auth:expired'));
-      }
-      clearTokens();
-      return null;
-    }
+    if (!res.ok) return null;
 
     const json = await res.json();
     const newToken: string | undefined = json?.data?.accessToken;
-
-    if (!newToken) {
-      clearTokens();
-      return null;
-    }
+    if (!newToken) return null;
 
     storeAccessToken(newToken);
     return newToken;
   } catch {
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new Event('auth:expired'));
-    }
-    clearTokens();
     return null;
   }
 }
@@ -117,6 +99,11 @@ export async function authFetch(
     if (newToken) {
       headers.set('Authorization', `Bearer ${newToken}`);
       return fetch(url, { ...options, headers });
+    }
+    // Refresh failed mid-session — clear state and notify UI
+    clearTokens();
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('auth:expired'));
     }
   }
 

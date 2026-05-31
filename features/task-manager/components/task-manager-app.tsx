@@ -173,13 +173,6 @@ export function TaskManagerApp() {
     if (boards.length > 0 && !activeBoardId) setActiveBoardId(boards[0].id);
   }, [boards, activeBoardId]);
 
-  // Fix A3: listen for auth:expired event dispatched by authFetch and call logout
-  useEffect(() => {
-    const handler = () => logout();
-    window.addEventListener('auth:expired', handler);
-    return () => window.removeEventListener('auth:expired', handler);
-  }, [logout]);
-
   // Decode JWT for user profile
   const profile   = token ? decodeJwtPayload(token) : null;
   const userName  = profile?.name  ?? profile?.email?.split('@')[0] ?? 'User';

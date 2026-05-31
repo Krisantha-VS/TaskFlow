@@ -9,7 +9,7 @@ const CSP = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "font-src 'self' https://fonts.gstatic.com",
   "img-src 'self' data: blob:",
-  "connect-src 'self' https://auth-saas.royalda.com",
+  "connect-src 'self' https://auth-saas.royalda.com https://cloudflareinsights.com",
   "frame-ancestors 'none'",
 ].join('; ');
 
