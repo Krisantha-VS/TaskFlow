@@ -5,6 +5,22 @@ export const DEFAULT_STATUS_KEYS = ['todo', 'in_progress', 'done'] as const;
 export type DefaultStatus = typeof DEFAULT_STATUS_KEYS[number];
 export type TaskPriority = 'low' | 'medium' | 'high';
 
+export const DEPENDENCY_TYPES = [
+  { value: 'blocks',     label: 'Blocks',       icon: '🔒', badge: 'badge-blocked' },
+  { value: 'depends_on', label: 'Depends on',    icon: '🔗', badge: 'badge-info' },
+  { value: 'relates_to', label: 'Relates to',    icon: '📎', badge: '' },
+  { value: 'duplicates', label: 'Duplicates',    icon: '📋', badge: 'badge-warning' },
+  { value: 'closes',     label: 'Closes',        icon: '✅', badge: 'badge-success' },
+] as const;
+
+export type DependencyType = typeof DEPENDENCY_TYPES[number]['value'];
+
+function getDepConfig(type: string) {
+  return DEPENDENCY_TYPES.find(d => d.value === type) ?? DEPENDENCY_TYPES[0];
+}
+
+export { getDepConfig };
+
 export interface BoardColumn {
   key: string;
   label: string;
@@ -44,6 +60,7 @@ export interface Subtask {
 export interface Task {
   id: number;
   board_id: number;
+  issue_number: number;
   user_id: string;
   title: string;
   description: string | null;
@@ -58,6 +75,7 @@ export interface Task {
   labels?: Label[];
   subtasks?: Subtask[];
   blockedBy?: TaskDependency[];
+  blocking?: TaskDependency[];
   sprintId?: number | null;
 }
 
@@ -86,7 +104,9 @@ export interface TaskDependency {
   id: number;
   blockerId: number;
   blockedId: number;
-  blocker: { id: number; title: string };
+  type: string;
+  blocker: { id: number; title: string; issue_number?: number };
+  blocked?: { id: number; title: string; issue_number?: number };
 }
 
 export interface ActivityLog {

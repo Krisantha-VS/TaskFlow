@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     const willSpawn = body.status === 'done' && task.recurrence;
 
     if (willSpawn) {
-      // HTTP adapter doesn't support $transaction — run sequentially
+      // Use transaction to atomically assign issue number for the spawned task
       const base = task.dueDate ? new Date(task.dueDate) : new Date();
       const y = base.getFullYear(), mo = base.getMonth(), d = base.getDate();
       let next: Date;
@@ -55,25 +55,39 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       else if (task.recurrence === 'weekly') next = new Date(y, mo, d + 7);
       else /* monthly */                     next = new Date(y, mo + 1, d);
 
-      await db.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
-      await db.task.create({
-        data: {
-          boardId:     task.boardId,
-          userId:      task.userId,
-          title:       task.title,
-          description: task.description,
-          priority:    task.priority,
-          status:      'todo',
-          position:    0,
-          recurrence:  task.recurrence,
-          dueDate:     next,
-        },
+      await db.$transaction(async (tx) => {
+        await tx.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
+        const boardRef = await tx.board.update({
+          where: { id: task.boardId },
+          data: { nextIssueNumber: { increment: 1 } },
+        });
+        await tx.task.create({
+          data: {
+            boardId:     task.boardId,
+            issueNumber: boardRef.nextIssueNumber - 1,
+            userId:      task.userId,
+            title:       task.title,
+            description: task.description,
+            priority:    task.priority,
+            status:      'todo',
+            position:    0,
+            recurrence:  task.recurrence,
+            dueDate:     next,
+          },
+        });
       });
     } else {
       await db.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
     }
 
-    const updated = await db.task.findFirst({ where: { id, userId } });
+    const updated = await db.task.findFirst({
+      where: { id, userId },
+      include: {
+        labels: true,
+        blockedBy: { include: { blocker: { select: { id: true, title: true, issueNumber: true } } } },
+        blocking: { include: { blocked: { select: { id: true, title: true, issueNumber: true } } } },
+      },
+    });
     logActivity({ boardId: task.boardId, userId, action, taskId: id, detail: changes });
 
     // Non-blocking email: notify new assignee when assigneeEmail is set or changed

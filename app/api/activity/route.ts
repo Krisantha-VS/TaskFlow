@@ -15,13 +15,16 @@ export async function GET(req: NextRequest) {
     const userId = await getUser(req);
     if (!checkRateLimit(userId)) return fail('Too many requests', 429);
     const boardId = parseInt(req.nextUrl.searchParams.get('board_id') ?? '');
+    const taskIdParam = req.nextUrl.searchParams.get('task_id');
     if (!boardId || boardId < 1) return fail('board_id required', 400);
     const board = await db.board.findFirst({ where: { id: boardId, userId } });
     if (!board) return fail('Board not found', 404);
+    const where: { boardId: number; taskId?: number } = { boardId };
+    if (taskIdParam) where.taskId = parseInt(taskIdParam);
     const logs = await db.activityLog.findMany({
-      where: { boardId },
+      where,
       orderBy: { createdAt: 'desc' },
-      take: 50,
+      take: taskIdParam ? 100 : 50,
     });
     return ok(logs);
   } catch (e) { return handleError(e); }

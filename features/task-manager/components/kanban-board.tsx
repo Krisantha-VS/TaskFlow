@@ -235,8 +235,8 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
     }, 3000);
   };
 
-  const handleAddTask = async (title: string, priority: Task['priority'], description: string) => {
-    const { error } = await createTask(title, priority, description);
+  const handleAddTask = async (title: string, priority: Task['priority'], description: string, status: string) => {
+    const { error } = await createTask(title, priority, description, status);
     if (error) addToast(error, 'error');
     else addToast('Task created', 'success');
   };
@@ -600,6 +600,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
               }}
               onStatusChange={moveTask}
               onAddTask={handleAddTask}
+              onToggleSubtask={toggleSubtask}
               onEdit={task => {
                 lastFocusRef.current = document.activeElement as HTMLElement;
                 setEditingTaskId(task.id);
@@ -662,9 +663,9 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
             comments={comments[editingTask.id] ?? []}
             onAddComment={(text) => addComment(editingTask.id, text)}
             onDeleteComment={(id) => deleteComment(editingTask.id, id)}
-            allTasks={tasks.map(t => ({ id: t.id, title: t.title }))}
-            onAddDependency={(blockerId) => addDependency(editingTask.id, blockerId)}
-            onRemoveDependency={(blockerId) => removeDependency(editingTask.id, blockerId)}
+            allTasks={tasks.map(t => ({ id: t.id, title: t.title, issue_number: t.issue_number }))}
+            onAddDependency={(blockerId, type) => addDependency(editingTask.id, blockerId, type)}
+            onRemoveDependency={(blockerId, type) => removeDependency(editingTask.id, blockerId, type)}
           />
         )}
       </AnimatePresence>

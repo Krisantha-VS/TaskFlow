@@ -2,7 +2,58 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { taskApi } from '../api';
-import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn, Sprint } from '../types';
+import type { Board, Task, Label, TaskStatus, TaskPriority, ActivityLog, Subtask, Comment, BoardColumn, Sprint, TaskDependency } from '../types';
+
+// Prisma returns camelCase field names, but our frontend types use snake_case.
+// This normalizer ensures all compound-name fields are accessible via their
+// snake_case aliases without breaking existing single-word fields.
+function normalizeTask(raw: any): Task {
+  if (!raw || typeof raw !== 'object') return raw as Task;
+  const t: any = { ...raw };
+  // Map camelCase → snake_case for compound-name fields
+  if (raw.issueNumber !== undefined && t.issue_number === undefined) t.issue_number = raw.issueNumber;
+  if (raw.boardId !== undefined && t.board_id === undefined) t.board_id = raw.boardId;
+  if (raw.userId !== undefined && t.user_id === undefined) t.user_id = raw.userId;
+  if (raw.dueDate !== undefined && t.due_date === undefined) t.due_date = raw.dueDate ? String(raw.dueDate).slice(0, 10) : null;
+  if (raw.nextOccurrence !== undefined && t.next_occurrence === undefined) t.next_occurrence = raw.nextOccurrence ? String(raw.nextOccurrence) : null;
+  if (raw.createdAt !== undefined && t.created_at === undefined) t.created_at = raw.createdAt;
+  if (raw.updatedAt !== undefined && t.updated_at === undefined) t.updated_at = raw.updatedAt;
+  if (raw.sprintId !== undefined && t.sprintId === undefined) t.sprintId = raw.sprintId;
+  // Normalize nested relations
+  if (raw.blockedBy) t.blockedBy = raw.blockedBy.map(normalizeDependency);
+  if (raw.blocking) t.blocking = raw.blocking.map(normalizeDependency);
+  if (raw.labels) t.labels = raw.labels.map(normalizeLabel);
+  if (raw.subtasks) t.subtasks = raw.subtasks.map(normalizeSubtask);
+  return t as Task;
+}
+
+function normalizeDependency(raw: any): TaskDependency {
+  const d: any = { ...raw };
+  if (raw.blocker) {
+    d.blocker = {
+      ...raw.blocker,
+      issue_number: raw.blocker.issueNumber ?? raw.blocker.issue_number,
+    };
+  }
+  if (raw.blocked) {
+    d.blocked = {
+      ...raw.blocked,
+      issue_number: raw.blocked.issueNumber ?? raw.blocked.issue_number,
+    };
+  }
+  return d as TaskDependency;
+}
+
+function normalizeLabel(raw: any): Label {
+  if (raw.boardId !== undefined && raw.board_id === undefined) raw.board_id = raw.boardId;
+  return raw as Label;
+}
+
+function normalizeSubtask(raw: any): Subtask {
+  if (raw.taskId !== undefined && raw.task_id === undefined) raw.task_id = raw.taskId;
+  if (raw.createdAt !== undefined && raw.created_at === undefined) raw.created_at = raw.createdAt;
+  return raw as Subtask;
+}
 
 export function useTasks(token: string | null, boardId: number | null) {
   const [tasks, setTasks]               = useState<Task[]>([]);
@@ -13,13 +64,30 @@ export function useTasks(token: string | null, boardId: number | null) {
   const [mutationError, setMutationError] = useState<string | null>(null);
   const [sprints, setSprints]           = useState<Sprint[]>([]);
 
+  // Track recently mutated task IDs to skip SSE echoes (prevents double-update)
+  const recentlyMutated = useRef<Map<number, number>>(new Map());
+
+  const markMutated = useCallback((taskId: number) => {
+    recentlyMutated.current.set(taskId, Date.now());
+    // Cleanup stale entries after 3s
+    setTimeout(() => {
+      const ts = recentlyMutated.current.get(taskId);
+      if (ts && Date.now() - ts >= 2500) recentlyMutated.current.delete(taskId);
+    }, 3000);
+  }, []);
+
+  const isRecentlyMutated = useCallback((taskId: number): boolean => {
+    const ts = recentlyMutated.current.get(taskId);
+    return ts != null && (Date.now() - ts) < 2000;
+  }, []);
+
   const load = useCallback(async () => {
     if (!token || !boardId) return;
     setLoading(true);
     setError(null);
     try {
       const tasksData = await taskApi.getTasks(token, boardId);
-      setTasks(tasksData);
+      setTasks(tasksData.map(normalizeTask));
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Failed to load tasks');
     } finally {
@@ -72,24 +140,31 @@ export function useTasks(token: string | null, boardId: number | null) {
                 const { type, data } = event;
 
                 if (type === 'task_created' && data?.task) {
-                  // Append new task only if not already present (guard against own mutation echo)
-                  setTasks(prev => prev.some(t => t.id === data.task.id) ? prev : [...prev, data.task]);
+                  const task = normalizeTask(data.task);
+                  if (isRecentlyMutated(task.id)) continue;
+                  setTasks(prev => prev.some(t => t.id === task.id) ? prev : [...prev, task]);
                 } else if (type === 'task_updated' && data?.task) {
-                  // Replace the existing task by id; if not found, fall back to full refetch
+                  const task = normalizeTask(data.task);
+                  if (isRecentlyMutated(task.id)) continue;
                   setTasks(prev => {
-                    const idx = prev.findIndex(t => t.id === data.task.id);
+                    const idx = prev.findIndex(t => t.id === task.id);
                     if (idx === -1) { load(); return prev; }
-                    return prev.map(t => t.id === data.task.id ? data.task : t);
+                    return prev.map(t => t.id === task.id ? task : t);
                   });
                 } else if (type === 'task_moved' && data?.task) {
-                  // Update status/column fields in state
-                  setTasks(prev => prev.map(t => t.id === data.task.id ? data.task : t));
+                  const task = normalizeTask(data.task);
+                  if (isRecentlyMutated(task.id)) continue;
+                  setTasks(prev => prev.map(t => t.id === task.id ? task : t));
                 } else if (type === 'task_deleted' && data?.taskId) {
+                  if (isRecentlyMutated(data.taskId)) continue;
                   setTasks(prev => prev.filter(t => t.id !== data.taskId));
-                } else {
-                  // Unknown event type or missing task payload — full refetch as safety net
-                  load();
+                } else if ((type === 'task_labeled' || type === 'task_blocked' || type === 'subtask_updated') && data?.task) {
+                  // Granular update for label/blocker/subtask changes from other clients
+                  const task = normalizeTask(data.task);
+                  if (isRecentlyMutated(task.id)) continue;
+                  setTasks(prev => prev.map(t => t.id === task.id ? task : t));
                 }
+                // Unknown event types are silently ignored (no full refetch)
               } catch { /* ignore parse errors */ }
             }
           }
@@ -113,12 +188,14 @@ export function useTasks(token: string | null, boardId: number | null) {
     title: string,
     priority: TaskPriority = 'medium',
     description = '',
+    status?: string,
   ): Promise<{ error: string | null; task?: Task }> => {
     if (!token || !boardId) return { error: 'Not authenticated' };
     setMutationError(null);
     try {
-      const task = await taskApi.createTask(token, { board_id: boardId, title, priority, description });
+      const task = normalizeTask(await taskApi.createTask(token, { board_id: boardId, title, priority, description, status }));
       setTasks(prev => [...prev, task]);
+      markMutated(task.id);
       return { error: null, task };
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to create task';
@@ -135,8 +212,9 @@ export function useTasks(token: string | null, boardId: number | null) {
     if (!token) return { error: 'Not authenticated' };
     setMutationError(null);
     try {
-      const updated = await taskApi.updateTask(token, id, data);
+      const updated = normalizeTask(await taskApi.updateTask(token, id, data));
       setTasks(prev => prev.map(t => t.id === id ? updated : t));
+      markMutated(id);
       return { error: null, task: updated };
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to update task';
@@ -155,8 +233,9 @@ export function useTasks(token: string | null, boardId: number | null) {
     setTasks(current => current.map(t => t.id === id ? { ...t, status } : t));
 
     try {
-      const updated = await taskApi.updateTask(token, id, { status });
+      const updated = normalizeTask(await taskApi.updateTask(token, id, { status }));
       setTasks(current => current.map(t => t.id === id ? updated : t));
+      markMutated(id);
       return { error: null };
     } catch (e) {
       // Rollback
@@ -178,6 +257,7 @@ export function useTasks(token: string | null, boardId: number | null) {
 
     try {
       await taskApi.deleteTask(token, id);
+      markMutated(id);
       return { error: null };
     } catch (e) {
       // Rollback
@@ -203,6 +283,7 @@ export function useTasks(token: string | null, boardId: number | null) {
     }));
     try {
       await taskApi.addTaskLabel(token, taskId, labelId);
+      markMutated(taskId);
       return { error: null };
     } catch (e) {
       setTasks(prevTasks);
@@ -223,6 +304,7 @@ export function useTasks(token: string | null, boardId: number | null) {
     }));
     try {
       await taskApi.removeTaskLabel(token, taskId, labelId);
+      markMutated(taskId);
       return { error: null };
     } catch (e) {
       setTasks(prevTasks);
@@ -232,32 +314,57 @@ export function useTasks(token: string | null, boardId: number | null) {
     }
   };
 
-  const addDependency = useCallback(async (taskId: number, blockerId: number): Promise<{ error: string | null }> => {
+  const addDependency = useCallback(async (taskId: number, blockerId: number, type = 'blocks'): Promise<{ error: string | null }> => {
     if (!token) return { error: null };
+    const prevTasks = tasks;
+    // Optimistic update — find blocker info from existing tasks
+    const blocker = tasks.find(t => t.id === blockerId);
+    if (blocker) {
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        const existing = t.blockedBy ?? [];
+        if (existing.some(d => d.blockerId === blockerId)) return t;
+        return {
+          ...t,
+          blockedBy: [...existing, {
+            id: 0, // temp id, will be replaced on next full fetch
+            blockerId,
+            blockedId: taskId,
+            type,
+            blocker: { id: blocker.id, title: blocker.title, issue_number: blocker.issue_number },
+          }],
+        };
+      }));
+    }
     try {
-      await taskApi.addDependency(token, taskId, blockerId);
+      await taskApi.addDependency(token, taskId, blockerId, type);
+      markMutated(taskId);
+      // Refresh from server to get the real dependency id and normalized type
       await load();
       return { error: null };
     } catch (e) {
+      setTasks(prevTasks); // Rollback
       const msg = e instanceof Error ? e.message : 'Failed to add dependency';
       setMutationError(msg);
       return { error: msg };
     }
-  }, [token, load]);
+  }, [token, tasks, load, markMutated]);
 
-  const removeDependency = useCallback(async (taskId: number, blockerId: number) => {
+  const removeDependency = useCallback(async (taskId: number, blockerId: number, type = 'blocks') => {
     if (!token) return;
+    const prevTasks = tasks;
     // Optimistic
     setTasks(prev => prev.map(t => t.id === taskId
-      ? { ...t, blockedBy: (t.blockedBy ?? []).filter(d => d.blockerId !== blockerId) }
+      ? { ...t, blockedBy: (t.blockedBy ?? []).filter(d => d.blockerId !== blockerId || d.type !== type) }
       : t
     ));
     try {
-      await taskApi.removeDependency(token, taskId, blockerId);
+      await taskApi.removeDependency(token, taskId, blockerId, type);
+      markMutated(taskId);
     } catch {
-      await load();
+      setTasks(prevTasks); // Rollback on error
     }
-  }, [token, load]);
+  }, [token, tasks, markMutated]);
 
   const createLabel = async (name: string, color: string): Promise<void> => {
     if (!token || !boardId) return;
@@ -272,8 +379,8 @@ export function useTasks(token: string | null, boardId: number | null) {
     if (!token || !boardId) return;
     setActivityLoading(true);
     try {
-      const logs = await taskApi.getActivity(token, boardId);
-      setActivity(logs.filter(l => l.taskId === taskId || l.taskId === null));
+      const logs = await taskApi.getActivity(token, boardId, taskId);
+      setActivity(logs);
     } catch { /* non-critical */ }
     finally { setActivityLoading(false); }
   }, [token, boardId]);
@@ -293,6 +400,11 @@ export function useTasks(token: string | null, boardId: number | null) {
     try {
       const subtask = await taskApi.createSubtask(token, taskId, title);
       setSubtasks(prev => ({ ...prev, [taskId]: [...(prev[taskId] ?? []), subtask] }));
+      // Sync to parent task's subtasks array
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        return { ...t, subtasks: [...(t.subtasks ?? []), subtask] };
+      }));
       return { error: null };
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'Failed to create subtask';
@@ -303,18 +415,34 @@ export function useTasks(token: string | null, boardId: number | null) {
 
   const toggleSubtask = useCallback(async (taskId: number, subtaskId: number, completed: boolean) => {
     if (!token) return;
-    // Optimistic update
+    // Optimistic update — subtasks map
     setSubtasks(prev => ({
       ...prev,
       [taskId]: (prev[taskId] ?? []).map(s => s.id === subtaskId ? { ...s, completed } : s),
     }));
+    // Also sync to the parent task's subtasks array so TaskCard progress bar updates
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId || !t.subtasks) return t;
+      return {
+        ...t,
+        subtasks: t.subtasks.map(s => s.id === subtaskId ? { ...s, completed } : s),
+      };
+    }));
     try {
       await taskApi.updateSubtask(token, subtaskId, { completed });
     } catch {
-      // Rollback
+      // Rollback subtasks map
       setSubtasks(prev => ({
         ...prev,
         [taskId]: (prev[taskId] ?? []).map(s => s.id === subtaskId ? { ...s, completed: !completed } : s),
+      }));
+      // Rollback tasks state
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId || !t.subtasks) return t;
+        return {
+          ...t,
+          subtasks: t.subtasks.map(s => s.id === subtaskId ? { ...s, completed: !completed } : s),
+        };
       }));
     }
   }, [token]);
@@ -323,11 +451,21 @@ export function useTasks(token: string | null, boardId: number | null) {
     if (!token) return { error: 'Not authenticated' };
     const prevSubtasks = subtasks[taskId];
     setSubtasks(prev => ({ ...prev, [taskId]: (prev[taskId] ?? []).filter(s => s.id !== subtaskId) }));
+    // Sync to parent task
+    setTasks(prev => prev.map(t => {
+      if (t.id !== taskId || !t.subtasks) return t;
+      return { ...t, subtasks: t.subtasks.filter(s => s.id !== subtaskId) };
+    }));
     try {
       await taskApi.deleteSubtask(token, subtaskId);
       return { error: null };
     } catch (e) {
       if (prevSubtasks !== undefined) setSubtasks(prev => ({ ...prev, [taskId]: prevSubtasks }));
+      // Rollback task state
+      setTasks(prev => prev.map(t => {
+        if (t.id !== taskId) return t;
+        return { ...t, subtasks: prevSubtasks };
+      }));
       const msg = e instanceof Error ? e.message : 'Failed to delete subtask';
       setMutationError(msg);
       return { error: msg };

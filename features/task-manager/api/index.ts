@@ -56,8 +56,8 @@ export const taskApi = {
   removeTaskLabel: (token: string, taskId: number, labelId: number) =>
     req<null>(`tasks/${taskId}/labels`, 'DELETE', { labelId }, token),
 
-  getActivity: (token: string, boardId: number) =>
-    req<ActivityLog[]>(`activity?board_id=${boardId}`, 'GET', undefined, token),
+  getActivity: (token: string, boardId: number, taskId?: number) =>
+    req<ActivityLog[]>(`activity?board_id=${boardId}${taskId ? `&task_id=${taskId}` : ''}`, 'GET', undefined, token),
 
   getAnalytics: (token: string, boardId: number) =>
     req<BoardAnalytics>(`boards/${boardId}/analytics`, 'GET', undefined, token),
@@ -80,10 +80,10 @@ export const taskApi = {
   deleteComment: (token: string, id: number) =>
     req<null>(`comments/${id}`, 'DELETE', undefined, token),
 
-  addDependency: (token: string, taskId: number, blockerId: number) =>
-    req<TaskDependency>(`tasks/${taskId}/dependencies`, 'POST', { blocker_id: blockerId }, token),
-  removeDependency: (token: string, taskId: number, blockerId: number) =>
-    req<null>(`tasks/${taskId}/dependencies`, 'DELETE', { blocker_id: blockerId }, token),
+  addDependency: (token: string, taskId: number, blockerId: number, type = 'blocks') =>
+    req<TaskDependency>(`tasks/${taskId}/dependencies`, 'POST', { blocker_id: blockerId, type }, token),
+  removeDependency: (token: string, taskId: number, blockerId: number, type = 'blocks') =>
+    req<null>(`tasks/${taskId}/dependencies`, 'DELETE', { blocker_id: blockerId, type }, token),
 
   getSprints: (token: string, boardId: number) =>
     req<Sprint[]>(`sprints?board_id=${boardId}`, 'GET', undefined, token),

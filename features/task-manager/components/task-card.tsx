@@ -3,8 +3,8 @@
 import React, { useMemo, useState } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { AnimatePresence, motion } from 'framer-motion';
-import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar } from 'lucide-react';
-import { type Task, PRIORITY_CONFIG, COLUMNS } from '../types';
+import { Trash2, GripVertical, ChevronDown, ChevronRight, Pencil, Calendar, CheckSquare } from 'lucide-react';
+import { type Task, type Subtask, PRIORITY_CONFIG, COLUMNS, DEPENDENCY_TYPES } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
 import { useReducedMotion } from '@/lib/useMotion';
@@ -17,6 +17,7 @@ interface Props {
   isSelected?: boolean;
   onToggleSelect?: (id: number) => void;
   isDragOverlay?: boolean;
+  onToggleSubtask?: (taskId: number, subtaskId: number, completed: boolean) => void;
 }
 
 function getDueDateStyle(dueDate: string | null | undefined): { label: string; className: string } | null {
@@ -33,11 +34,14 @@ function getDueDateStyle(dueDate: string | null | undefined): { label: string; c
   return { label, className: 'text-muted-foreground bg-muted/50' };
 }
 
-function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggleSelect, isDragOverlay }: Props) {
+function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggleSelect, isDragOverlay, onToggleSubtask }: Props) {
   const [expanded, setExpanded] = useState(false);
+  const [checklistOpen, setChecklistOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const priority = PRIORITY_CONFIG[task.priority];
   const due = useMemo(() => getDueDateStyle(task.due_date), [task.due_date]);
+  const subtaskCount = task.subtasks?.length ?? 0;
+  const subtaskCompleted = task.subtasks?.filter(s => s.completed).length ?? 0;
   const otherStatuses = COLUMNS.filter(c => c.key !== task.status);
 
   const { attributes, listeners, setNodeRef, isDragging } = useDraggable({
@@ -94,20 +98,52 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
       {/* Header */}
       <div className="flex items-start gap-2 ml-7">
         <div className="flex-1 min-w-0">
-          {/* T2-4: font-semibold */}
-          <p className="text-sm font-semibold leading-snug break-words">{task.title}</p>
-          {task.subtasks && task.subtasks.length > 0 && (
-            <div className="flex items-center gap-2 mt-1.5">
+          {/* Issue number + title */}
+          <p className="text-sm font-semibold leading-snug break-words">
+            <span className="text-muted-foreground/60 font-normal mr-1">#{task.issue_number}</span>
+            {task.title}
+          </p>
+          {subtaskCount > 0 && (
+            <button
+              onClick={e => { e.stopPropagation(); setChecklistOpen(v => !v); }}
+              className="flex items-center gap-2 mt-1.5 w-full text-left group/checklist"
+            >
               <div className="flex-1 h-1 bg-muted rounded-full overflow-hidden">
                 <div
                   className="h-full bg-primary/60 rounded-full transition-all"
-                  style={{ width: `${Math.round((task.subtasks.filter(s => s.completed).length / task.subtasks.length) * 100)}%` }}
+                  style={{ width: `${Math.round((subtaskCompleted / subtaskCount) * 100)}%` }}
                 />
               </div>
-              {/* T2-4: text-xs instead of text-[10px] */}
-              <span className="text-xs text-muted-foreground shrink-0">
-                {task.subtasks.filter(s => s.completed).length}/{task.subtasks.length}
+              <span className="text-xs text-muted-foreground shrink-0 group-hover/checklist:text-foreground transition-colors">
+                {subtaskCompleted}/{subtaskCount}
               </span>
+            </button>
+          )}
+          {/* Inline checklist */}
+          {checklistOpen && task.subtasks && task.subtasks.length > 0 && (
+            <div className="mt-1.5 space-y-1 pl-1">
+              {task.subtasks.map(s => (
+                <div key={s.id} className="flex items-center gap-1.5">
+                  <button
+                    type="button"
+                    role="checkbox"
+                    aria-checked={s.completed}
+                    aria-label={`${s.title}, subtask`}
+                    onClick={e => {
+                      e.stopPropagation();
+                      onToggleSubtask?.(task.id, s.id, !s.completed);
+                    }}
+                    className={`w-3.5 h-3.5 rounded border flex items-center justify-center shrink-0 transition-colors ${
+                      s.completed ? 'bg-primary border-primary' : 'border-border hover:border-primary/50'
+                    }`}
+                  >
+                    {s.completed && <span className="text-primary-foreground text-[10px] leading-none">✓</span>}
+                  </button>
+                  <span className={`text-xs ${s.completed ? 'line-through text-muted-foreground/60' : ''}`}>
+                    {s.title}
+                  </span>
+                </div>
+              ))}
             </div>
           )}
         </div>
@@ -165,15 +201,18 @@ function TaskCard({ task, onDelete, onStatusChange, onEdit, isSelected, onToggle
         </div>
       )}
 
-      {/* T2-6: Blocked badge with blocker name */}
-      {task.blockedBy && task.blockedBy.length > 0 && (
+      {/* Blocked badge with blocker name, issue number, and relationship type icon */}
+      {task.blockedBy && task.blockedBy.length > 0 && (() => {
+        const depConfig = DEPENDENCY_TYPES.find(d => d.value === task.blockedBy![0].type) ?? DEPENDENCY_TYPES[0];
+        return (
         <div className="mt-1.5 ml-7">
-          <span className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium">
-            🔒 {task.blockedBy[0].blocker.title}
-            {task.blockedBy.length > 1 && ` +${task.blockedBy.length - 1}`}
+          <span className={`${depConfig.badge || 'badge-blocked'} inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full font-medium`}>
+            {depConfig.icon} #{task.blockedBy![0].blocker.issue_number ?? task.blockedBy![0].blocker.id} {task.blockedBy![0].blocker.title}
+            {task.blockedBy!.length > 1 && ` +${task.blockedBy!.length - 1}`}
           </span>
         </div>
-      )}
+        );
+      })()}
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-3 ml-7">

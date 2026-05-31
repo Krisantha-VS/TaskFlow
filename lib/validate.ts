@@ -16,7 +16,7 @@ export const TaskCreateSchema = z.object({
   board_id: z.number({ error: 'board_id required' }).int().positive(),
   title: z.string().min(1, 'Title required').max(200, 'Title max 200 chars').trim(),
   description: z.string().max(5000, 'Description max 5000 chars').optional().nullable(),
-  status: z.enum(STATUS).optional(),
+  status: z.string().min(1).max(50).optional(),
   priority: z.enum(PRIORITY).optional(),
   due_date: z.string().datetime({ offset: true }).optional().nullable(),
   recurrence: z.enum(RECURRENCE).optional().nullable(),
@@ -25,7 +25,7 @@ export const TaskCreateSchema = z.object({
 export const TaskUpdateSchema = z.object({
   title: z.string().min(1).max(200).trim().optional(),
   description: z.string().max(5000).optional().nullable(),
-  status: z.enum(STATUS).optional(),
+  status: z.string().min(1).max(50).optional(),
   priority: z.enum(PRIORITY).optional(),
   position: z.number().int().min(0).optional(),
   due_date: z.string().datetime({ offset: true }).optional().nullable(),

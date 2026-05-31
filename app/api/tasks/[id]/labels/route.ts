@@ -4,6 +4,7 @@ import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { TaskLabelSchema } from '@/lib/validate';
+import { logActivity } from '@/lib/activity';
 
 async function getUser(req: NextRequest) {
   const payload = await verifyJWT(extractBearer(req.headers.get('authorization')));
@@ -28,6 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       data: { labels: { connect: { id: labelId } } },
     });
     const updated = await db.task.findFirst({ where: { id: taskId }, include: { labels: true } });
+    logActivity({ boardId: task.boardId, userId, action: 'label_added', taskId, detail: `added label "${label.name}"` });
     return ok(updated);
   } catch (e) { return handleError(e); }
 }
@@ -48,6 +50,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
       where: { id: taskId },
       data: { labels: { disconnect: { id: labelId } } },
     });
+    logActivity({ boardId: task.boardId, userId, action: 'label_removed', taskId, detail: `removed label "${label.name}"` });
     return ok(null);
   } catch (e) { return handleError(e); }
 }

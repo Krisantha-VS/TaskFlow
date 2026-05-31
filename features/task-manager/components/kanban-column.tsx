@@ -16,8 +16,9 @@ interface Props {
   tasks: Task[];
   onDelete: (id: number) => void;
   onStatusChange: (id: number, status: string) => void;
-  onAddTask: (title: string, priority: Task['priority'], description: string) => void;
+  onAddTask: (title: string, priority: Task['priority'], description: string, status: string) => void;
   onEdit: (task: Task) => void;
+  onToggleSubtask?: (taskId: number, subtaskId: number, completed: boolean) => void;
   selected?: Set<number>;
   onToggleSelect?: (id: number) => void;
   onSelectAll?: (ids: number[]) => void;
@@ -25,7 +26,7 @@ interface Props {
 
 function KanbanColumn({
   status, label, colorClass, tasks,
-  onDelete, onStatusChange, onAddTask, onEdit,
+  onDelete, onStatusChange, onAddTask, onEdit, onToggleSubtask,
   selected, onToggleSelect, onSelectAll,
 }: Props) {
   const [adding, setAdding]     = useState(false);
@@ -38,7 +39,7 @@ function KanbanColumn({
 
   const submit = () => {
     if (!title.trim()) return;
-    onAddTask(title.trim(), priority, desc.trim());
+    onAddTask(title.trim(), priority, desc.trim(), status);
     setTitle(''); setPriority('medium'); setDesc(''); setAdding(false);
   };
 
@@ -90,6 +91,7 @@ function KanbanColumn({
                 onDelete={onDelete}
                 onStatusChange={onStatusChange}
                 onEdit={onEdit}
+                onToggleSubtask={onToggleSubtask}
                 isSelected={selected?.has(task.id)}
                 onToggleSelect={onToggleSelect}
               />

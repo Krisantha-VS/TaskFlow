@@ -2,6 +2,7 @@
 
 import { X, ArrowRight, AlertTriangle } from 'lucide-react';
 import type { Task } from '../types';
+import { DEPENDENCY_TYPES } from '../types';
 
 interface Props {
   tasks: Task[];
@@ -37,14 +38,15 @@ export function DependenciesPanel({ tasks, onClose }: Props) {
             deps.map(({ blockedTask, blockerTask, dep }) => {
               const isBlockedDone = blockedTask.status === 'done';
               const isBlockerDone = blockerTask.status === 'done';
+              const depConfig = DEPENDENCY_TYPES.find(d => d.value === dep.type) ?? DEPENDENCY_TYPES[0];
               return (
                 <div key={dep.id} className={`rounded-xl border p-3 space-y-2 ${isBlockedDone ? 'opacity-50' : ''}`}>
                   <div className="flex items-center gap-2 text-xs">
-                    <span className="badge-blocked px-2 py-0.5 rounded-full text-xs">
-                      {blockerTask.title}
+                    <span className={`${depConfig.badge || 'badge-blocked'} px-2 py-0.5 rounded-full text-xs`}>
+                      {depConfig.icon} {blockerTask.title}
                     </span>
                     <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden="true" />
-                    <span className="text-muted-foreground">blocks</span>
+                    <span className="text-muted-foreground">{dep.type}</span>
                     <ArrowRight className="w-3 h-3 text-muted-foreground shrink-0" aria-hidden="true" />
                     <span className="font-medium truncate">{blockedTask.title}</span>
                   </div>

@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, ChevronDown } from 'lucide-react';
 import { useReducedMotion } from '@/lib/useMotion';
-import { type Task, type Label, type ActivityLog, type Subtask, type Comment, PRIORITY_CONFIG } from '../types';
+import { type Task, type Label, type ActivityLog, type Subtask, type Comment, PRIORITY_CONFIG, DEPENDENCY_TYPES, type DependencyType } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -35,32 +35,48 @@ const COLOR_DOT: Record<string, string> = {
 function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<unknown> }) {
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!text.trim()) return;
     setAdding(true);
-    await onAdd(text.trim());
-    setText('');
-    setAdding(false);
+    setError(null);
+    try {
+      const result = await onAdd(text.trim());
+      // Check if result is an error object returned by createSubtask
+      if (result && typeof result === 'object' && 'error' in result && (result as any).error) {
+        setError((result as any).error);
+        setAdding(false);
+        return;
+      }
+      setText('');
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to add subtask');
+    } finally {
+      setAdding(false);
+    }
   };
 
   return (
-    <div className="flex gap-2 mt-2">
-      <input
-        value={text}
-        onChange={e => setText(e.target.value)}
-        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-        placeholder="Add a subtask..."
-        className="flex-1 px-2 py-1 text-xs rounded-md bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-      />
-      <button
-        type="button"
-        disabled={!text.trim() || adding}
-        onClick={submit}
-        className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
-      >
-        Add
-      </button>
+    <div className="flex flex-col gap-2 mt-2">
+      <div className="flex gap-2">
+        <input
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+          placeholder="Add a subtask..."
+          className="flex-1 px-2 py-1 text-xs rounded-md bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+        />
+        <button
+          type="button"
+          disabled={!text.trim() || adding}
+          onClick={submit}
+          className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
+        >
+          Add
+        </button>
+      </div>
+      {error && <p className="text-xs text-red-400">{error}</p>}
     </div>
   );
 }
@@ -165,9 +181,21 @@ interface Props {
   comments?: Comment[];
   onAddComment?: (text: string) => Promise<unknown>;
   onDeleteComment?: (id: number) => Promise<unknown>;
-  allTasks?: { id: number; title: string }[];
-  onAddDependency?: (blockerId: number) => Promise<unknown>;
-  onRemoveDependency?: (blockerId: number) => Promise<unknown>;
+  allTasks?: { id: number; title: string; issue_number?: number }[];
+  onAddDependency?: (blockerId: number, type?: string) => Promise<unknown>;
+  onRemoveDependency?: (blockerId: number, type?: string) => Promise<unknown>;
+}
+
+function BlockerBadge({ dep, onRemove }: { dep: { id: number; blocker: { id: number; title: string; issue_number?: number }; type?: string }; onRemove?: (blockerId: number, type?: string) => void }) {
+  const config = DEPENDENCY_TYPES.find(d => d.value === dep.type) ?? DEPENDENCY_TYPES[0];
+  return (
+    <span className={`${config.badge || 'badge-blocked'} inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full`}>
+      {config.icon} #{dep.blocker.issue_number ?? dep.blocker.id} {dep.blocker.title}
+      {onRemove && (
+        <button type="button" onClick={() => onRemove(dep.blocker.id, dep.type)} className="hover:opacity-70 ml-0.5">×</button>
+      )}
+    </span>
+  );
 }
 
 export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, onRemoveLabel, onCreateLabel, activity, activityLoading, subtasks = [], onCreateSubtask, onToggleSubtask, onDeleteSubtask, comments = [], onAddComment, onDeleteComment, allTasks, onAddDependency, onRemoveDependency }: Props) {
@@ -180,6 +208,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   const [saveError, setSaveError] = useState<string | null>(null); // Fix K3
   const [subtasksOpen, setSubtasksOpen] = useState(false); // T2-3: collapsible
   const [blockersOpen, setBlockersOpen] = useState(false); // T2-3: collapsible, closed by default
+  const [depType, setDepType] = useState<DependencyType>('blocks');
   const reduceMotion = useReducedMotion();
   const motionDuration = reduceMotion ? 0 : 0.2;
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -190,11 +219,10 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
 
   // Sync fields if the task prop updates externally (e.g. label/subtask mutations refresh the task)
   // Only sync fields that are not currently being edited (i.e. when not saving)
-  // Open subtasks if they exist when modal first loads
+  // Open subtasks if they exist when modal first loads or when subtasks arrive
   useEffect(() => {
-    setSubtasksOpen(subtasks.length > 0);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []); // only on mount
+    if (subtasks.length > 0) setSubtasksOpen(true);
+  }, [subtasks.length]);
 
   useEffect(() => {
     if (saving) return;
@@ -480,6 +508,7 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
 
           {/* T2-3: Blockers — collapsible, closed by default */}
           {(onAddDependency || onRemoveDependency) && (
+            <>
             <div>
               <button
                 type="button"
@@ -498,35 +527,87 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                 <>
                   <div className="flex flex-wrap gap-1.5 mb-2">
                     {(task.blockedBy ?? []).map(dep => (
-                      <span key={dep.id} className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full">
-                        🔒 {dep.blocker.title}
-                        {onRemoveDependency && (
-                          <button type="button" onClick={() => onRemoveDependency(dep.blockerId)} className="hover:opacity-70 ml-0.5">×</button>
-                        )}
-                      </span>
+                      <BlockerBadge key={dep.id} dep={dep} onRemove={onRemoveDependency} />
                     ))}
+                    {(task.blockedBy ?? []).length === 0 && (
+                      <p className="text-xs text-muted-foreground/50 italic">Nothing blocking this task.</p>
+                    )}
                   </div>
                   {onAddDependency && (allTasks ?? []).filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id)).length > 0 && (
-                    <select
-                      defaultValue=""
-                      onChange={async e => {
-                        if (!e.target.value) return;
-                        const result = await onAddDependency(parseInt(e.target.value)) as { error?: string | null } | void;
-                        if (result?.error) { setSaveError(result.error); return; }
-                        e.target.value = '';
-                      }}
-                      className="w-full px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-                    >
-                      <option value="">+ Add blocker…</option>
-                      {(allTasks ?? [])
-                        .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
-                        .map(t => <option key={t.id} value={t.id}>{t.title}</option>)
-                      }
-                    </select>
+                    <div className="flex gap-2">
+                      <select
+                        defaultValue=""
+                        onChange={async e => {
+                          if (!e.target.value) return;
+                          const result = await onAddDependency(parseInt(e.target.value), depType) as { error?: string | null } | void;
+                          if (result?.error) { setSaveError(result.error); return; }
+                          e.target.value = '';
+                        }}
+                        className="flex-1 px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                      >
+                        <option value="">+ Add relationship…</option>
+                        {(allTasks ?? [])
+                          .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
+                          .map(t => <option key={t.id} value={t.id}>#{t.issue_number ?? t.id} {t.title}</option>)
+                        }
+                      </select>
+                      <select
+                        value={depType}
+                        onChange={e => setDepType(e.target.value as DependencyType)}
+                        className="w-28 px-2 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                        aria-label="Relationship type"
+                      >
+                        {DEPENDENCY_TYPES.map(dt => (
+                          <option key={dt.value} value={dt.value}>{dt.icon} {dt.label}</option>
+                        ))}
+                      </select>
+                    </div>
                   )}
                 </>
               )}
             </div>
+
+            {/* Blocks (what this task blocks) — T3-9 */}
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  const el = document.getElementById('blocks-section-toggle');
+                  const section = document.getElementById('blocks-section');
+                  if (!el || !section) return;
+                  const open = section.style.display !== 'none';
+                  section.style.display = open ? 'none' : 'block';
+                  el.setAttribute('aria-expanded', String(!open));
+                }}
+                id="blocks-section-toggle"
+                aria-expanded="false"
+                className="flex items-center gap-2 w-full text-xs font-semibold text-muted-foreground/70 uppercase tracking-wider hover:text-foreground transition-colors mb-2"
+              >
+                <ChevronDown className="w-3.5 h-3.5" aria-hidden="true" />
+                Blocks
+                {(task.blocking ?? []).length > 0 && (
+                  <span className="badge-info text-xs px-1.5 py-0.5 rounded-full normal-case tracking-normal font-normal">
+                    {(task.blocking ?? []).length}
+                  </span>
+                )}
+              </button>
+              <div id="blocks-section" style={{ display: 'none' }}>
+                <div className="flex flex-wrap gap-1.5 mb-2">
+                  {(task.blocking ?? []).map(dep => {
+                    const depConfig = DEPENDENCY_TYPES.find(d => d.value === dep.type) ?? DEPENDENCY_TYPES[0];
+                    return (
+                    <span key={dep.id} className={`${depConfig.badge || 'badge-info'} inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full`}>
+                      {depConfig.icon} #{dep.blocked?.issue_number ?? dep.blocked?.id} {dep.blocked?.title}
+                    </span>
+                    );
+                  })}
+                  {(task.blocking ?? []).length === 0 && (
+                    <p className="text-xs text-muted-foreground/50 italic">This task doesn't block anything.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            </>
           )}
 
           {/* Activity */}

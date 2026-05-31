@@ -7,15 +7,16 @@ datasource db {
 }
 
 model Board {
-  id        Int           @id @default(autoincrement())
-  userId    String
-  name      String        @db.VarChar(100)
-  createdAt DateTime      @default(now())
-  columns   Json?
-  tasks     Task[]
-  labels    Label[]
-  sprints   Sprint[]
-  members   BoardMember[]
+  id              Int           @id @default(autoincrement())
+  userId          String
+  name            String        @db.VarChar(100)
+  createdAt       DateTime      @default(now())
+  columns         Json?
+  nextIssueNumber Int           @default(1)
+  tasks           Task[]
+  labels          Label[]
+  sprints         Sprint[]
+  members         BoardMember[]
 
   @@index([userId])
 }
@@ -23,6 +24,7 @@ model Board {
 model Task {
   id             Int                @id @default(autoincrement())
   boardId        Int
+  issueNumber    Int
   userId         String
   sprintId       Int?
   title          String             @db.VarChar(200)
@@ -45,6 +47,7 @@ model Task {
   blockedBy      TaskDependency[]   @relation("BlockedTask")
   blocking       TaskDependency[]   @relation("BlockerTask")
 
+  @@unique([boardId, issueNumber])
   @@index([userId])
   @@index([boardId, status])
   @@index([sprintId])
@@ -116,10 +119,12 @@ model TaskDependency {
   id        Int      @id @default(autoincrement())
   blockerId Int
   blockedId Int
+  type      String   @default("blocks") @db.VarChar(30)
+  createdAt DateTime @default(now())
   blocker   Task     @relation("BlockerTask", fields: [blockerId], references: [id], onDelete: Cascade)
   blocked   Task     @relation("BlockedTask", fields: [blockedId], references: [id], onDelete: Cascade)
 
-  @@unique([blockerId, blockedId])
+  @@unique([blockerId, blockedId, type])
   @@index([blockedId])
   @@index([blockerId])
 }

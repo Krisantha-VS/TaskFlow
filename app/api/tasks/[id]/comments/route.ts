@@ -4,6 +4,7 @@ import { verifyJWT, extractBearer } from '@/lib/jwt';
 import { ok, fail, handleError, AuthError } from '@/lib/api';
 import { checkRateLimit } from '@/lib/rate-limit';
 import { CommentCreateSchema } from '@/lib/validate';
+import { logActivity } from '@/lib/activity';
 import { sendCommentEmail } from '@/lib/email';
 
 async function getUser(req: NextRequest): Promise<{ sub: string; name?: string; email?: string }> {
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     if (!task) return fail('Task not found', 404);
     const body = CommentCreateSchema.parse(await req.json());
     const comment = await db.comment.create({ data: { taskId, userId: user.sub, text: body.text } });
+
+    logActivity({ boardId: task.boardId, userId: user.sub, action: 'commented', taskId, detail: body.text.substring(0, 100) });
 
     // Non-blocking email: notify assignee when someone else comments
     if (task.assigneeEmail && task.assigneeEmail !== user.email) {
