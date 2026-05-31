@@ -26,6 +26,37 @@
 
 ---
 
+## Session 2026-05-31 — Auth migration + bug fixes + issue numbers
+
+**Commits:** `ce708ce` (auth review fixes) · `02e54b1` (issueNumber feature) · `120c279` (Neon transaction fix)
+
+### Auth rewrite (OAuth PKCE — committed before this session)
+- Full OAuth Authorization Code + PKCE flow replacing inline email/password auth
+- New routes: `/api/auth/login-start`, `/api/auth/callback`, `/api/auth/refresh`, `/api/auth/logout`
+- `refresh_token` → httpOnly cookie (`Path=/api`); `access_token` → sessionStorage
+- `_at_init` 30s readable cookie pattern for post-OAuth token handoff
+
+### Bug fixes applied this session (`ce708ce`)
+- `doRefresh()` no longer dispatches `auth:expired` or calls `clearTokens()` — anonymous page loads no longer fire spurious API requests
+- `authFetch` owns the `auth:expired` signal (only fires mid-session)
+- Removed duplicate `auth:expired` listener from `TaskManagerApp` (was causing double `/api/auth/logout` POST)
+- `dependencies/route.ts` P2002 catch: guard `findFirst` null → return 409 instead of `ok(null, 201)`
+- `next.config.ts`: added `cloudflareinsights.com` to `connect-src`
+- Removed dead `AUTH_BASE`/`AUTH_CLIENT_ID` import and `OAUTH_PKCE_METHOD` export
+
+### Issue numbers feature (`02e54b1` + `120c279`)
+- `Board.nextIssueNumber` counter; `Task.issueNumber` per-board unique (`@@unique([boardId, issueNumber])`)
+- Task create/recurrence spawn assigns issue number via sequential DB queries (NOT `$transaction` — Neon HTTP adapter unsupported)
+- `TaskDependency.type` column: blocks / depends_on / relates_to / duplicates / closes
+- `useTasks`: `normalizeTask()` maps camelCase API → snake_case types; `recentlyMutated` ref prevents SSE echo double-updates
+- Subtask create/toggle/delete synced to parent `tasks[]` array
+- `getActivity` passes `task_id` filter server-side; no client-side filtering
+
+### Key constraint: Neon HTTP adapter does NOT support `db.$transaction()`
+Use sequential queries. The `nextIssueNumber` increment is safe without a wrapper — `UPDATE ... SET n = n+1` is atomic in Postgres.
+
+---
+
 ## Context Files
 
 | File | What it covers | Load when... |
