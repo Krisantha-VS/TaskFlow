@@ -33,25 +33,27 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       rawCreated,
     ] = await Promise.all([
       db.task.findMany({
-        where: { boardId },
+        where: { boardId, deletedAt: null },
         select: { id: true, status: true, priority: true, createdAt: true, updatedAt: true },
       }),
-      // SQL aggregation: completions (done tasks) grouped by day for last 30 days
+      // Completions (done tasks) grouped by day — PostgreSQL quoted identifiers + TO_CHAR for string dates
       db.$queryRaw<{ date: string; count: bigint }[]>`
-        SELECT DATE(updatedAt) AS date, COUNT(*) AS count
-        FROM Task
-        WHERE boardId = ${boardId}
-          AND status = 'done'
-          AND updatedAt >= ${thirtyDaysAgo}
-        GROUP BY DATE(updatedAt)
+        SELECT TO_CHAR("updatedAt", 'YYYY-MM-DD') AS date, COUNT(*) AS count
+        FROM "Task"
+        WHERE "boardId" = ${boardId}
+          AND status = 'done'::"Status"
+          AND "updatedAt" >= ${thirtyDaysAgo}
+          AND "deletedAt" IS NULL
+        GROUP BY TO_CHAR("updatedAt", 'YYYY-MM-DD')
       `,
-      // SQL aggregation: creations grouped by day for last 30 days
+      // Creations grouped by day
       db.$queryRaw<{ date: string; count: bigint }[]>`
-        SELECT DATE(createdAt) AS date, COUNT(*) AS count
-        FROM Task
-        WHERE boardId = ${boardId}
-          AND createdAt >= ${thirtyDaysAgo}
-        GROUP BY DATE(createdAt)
+        SELECT TO_CHAR("createdAt", 'YYYY-MM-DD') AS date, COUNT(*) AS count
+        FROM "Task"
+        WHERE "boardId" = ${boardId}
+          AND "createdAt" >= ${thirtyDaysAgo}
+          AND "deletedAt" IS NULL
+        GROUP BY TO_CHAR("createdAt", 'YYYY-MM-DD')
       `,
     ]);
 
