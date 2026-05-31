@@ -55,26 +55,24 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       else if (task.recurrence === 'weekly') next = new Date(y, mo, d + 7);
       else /* monthly */                     next = new Date(y, mo + 1, d);
 
-      await db.$transaction(async (tx) => {
-        await tx.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
-        const boardRef = await tx.board.update({
-          where: { id: task.boardId },
-          data: { nextIssueNumber: { increment: 1 } },
-        });
-        await tx.task.create({
-          data: {
-            boardId:     task.boardId,
-            issueNumber: boardRef.nextIssueNumber - 1,
-            userId:      task.userId,
-            title:       task.title,
-            description: task.description,
-            priority:    task.priority,
-            status:      'todo',
-            position:    0,
-            recurrence:  task.recurrence,
-            dueDate:     next,
-          },
-        });
+      await db.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });
+      const boardRef = await db.board.update({
+        where: { id: task.boardId },
+        data: { nextIssueNumber: { increment: 1 } },
+      });
+      await db.task.create({
+        data: {
+          boardId:     task.boardId,
+          issueNumber: boardRef.nextIssueNumber - 1,
+          userId:      task.userId,
+          title:       task.title,
+          description: task.description,
+          priority:    task.priority,
+          status:      'todo',
+          position:    0,
+          recurrence:  task.recurrence,
+          dueDate:     next,
+        },
       });
     } else {
       await db.task.update({ where: { id }, data: update as Prisma.TaskUpdateInput });

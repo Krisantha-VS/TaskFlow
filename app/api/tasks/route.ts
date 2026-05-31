@@ -44,26 +44,23 @@ export async function POST(req: NextRequest) {
     const board = await db.board.findFirst({ where: { id: body.board_id, userId } });
     if (!board) return fail('Board not found', 404);
 
-    // Atomically increment board issue number and assign to task
-    const task = await db.$transaction(async (tx) => {
-      const updatedBoard = await tx.board.update({
-        where: { id: body.board_id },
-        data: { nextIssueNumber: { increment: 1 } },
-      });
-      const issueNumber = updatedBoard.nextIssueNumber - 1;
-      return tx.task.create({
-        data: {
-          boardId:     body.board_id,
-          issueNumber,
-          userId,
-          title:       body.title,
-          description: body.description ?? null,
-          status:      (body.status  ?? 'todo') as 'todo' | 'in_progress' | 'done',
-          priority:    body.priority ?? 'medium',
-          dueDate:     body.due_date ? new Date(body.due_date) : null,
-          recurrence:  body.recurrence ?? null,
-        },
-      });
+    // Increment board issue counter (atomic DB operation), then create task
+    const updatedBoard = await db.board.update({
+      where: { id: body.board_id },
+      data: { nextIssueNumber: { increment: 1 } },
+    });
+    const task = await db.task.create({
+      data: {
+        boardId:     body.board_id,
+        issueNumber: updatedBoard.nextIssueNumber - 1,
+        userId,
+        title:       body.title,
+        description: body.description ?? null,
+        status:      (body.status ?? 'todo') as 'todo' | 'in_progress' | 'done',
+        priority:    body.priority ?? 'medium',
+        dueDate:     body.due_date ? new Date(body.due_date) : null,
+        recurrence:  body.recurrence ?? null,
+      },
     });
     logActivity({ boardId: body.board_id, userId, action: 'created', taskId: task.id, detail: task.title });
     return ok(task, 201);
