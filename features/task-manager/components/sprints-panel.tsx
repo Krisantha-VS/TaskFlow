@@ -21,10 +21,13 @@ export function SprintsPanel({ sprints, activeSprint, onSelect, onCreateSprint, 
   const [saving, setSaving] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
+  // <input type="date"> returns "YYYY-MM-DD"; API requires full ISO datetime
+  const toIso = (d: string) => d ? new Date(d + 'T00:00:00').toISOString() : undefined;
+
   const handleCreate = async () => {
     if (!newName.trim()) return;
     setSaving(true);
-    await onCreateSprint(newName.trim(), newStart || undefined, newEnd || undefined);
+    await onCreateSprint(newName.trim(), toIso(newStart), toIso(newEnd));
     setNewName(''); setNewStart(''); setNewEnd(''); setCreating(false); setSaving(false);
   };
 

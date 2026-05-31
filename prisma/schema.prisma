@@ -50,6 +50,7 @@ model Task {
   @@unique([boardId, issueNumber])
   @@index([userId])
   @@index([boardId, status])
+  @@index([boardId, status, updatedAt])
   @@index([sprintId])
 }
 

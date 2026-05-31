@@ -12,7 +12,7 @@ import { TaskEditModal } from './task-edit-modal';
 import { useTasks } from '../hooks/useTasks';
 import { ConfirmDialog } from '@/components/confirm-dialog';
 import { ColumnEditor } from '@/components/column-editor';
-import { AnalyticsPanel } from './analytics-panel';
+import { AnalyticsPanel, prefetchAnalytics } from './analytics-panel';
 import { MembersPanel } from './members-panel';
 import { SprintsPanel } from './sprints-panel';
 import { DependenciesPanel } from './dependencies-panel';
@@ -379,6 +379,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
 
           <button
             onClick={() => setShowAnalytics(true)}
+            onMouseEnter={() => prefetchAnalytics(token, boardId)}
             title="View analytics"
             aria-label="Analytics"
             className="flex items-center gap-1.5 text-xs px-2.5 py-1.5 rounded-lg border border-border hover:bg-muted/50 hover:border-primary/50 text-muted-foreground hover:text-foreground transition-colors"
@@ -671,7 +672,7 @@ export function KanbanBoard({ token, boardId, board, onColumnsUpdate }: Props) {
       </AnimatePresence>
 
       {showAnalytics && (
-        <AnalyticsPanel token={token} boardId={boardId} onClose={() => setShowAnalytics(false)} />
+        <AnalyticsPanel token={token} boardId={boardId} tasks={tasks} onClose={() => setShowAnalytics(false)} />
       )}
 
       {showMembers && (
