@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react';
 import { motion } from 'framer-motion';
 import { X, ChevronDown } from 'lucide-react';
 import { useReducedMotion } from '@/lib/useMotion';
-import { type Task, type Label, type ActivityLog, type Subtask, type Comment, PRIORITY_CONFIG, DEPENDENCY_TYPES, type DependencyType } from '../types';
+import { type Task, type Label, type ActivityLog, type Subtask, type Comment, PRIORITY_CONFIG } from '../types';
 import { cn } from '@/lib/utils';
 import { LabelPill } from '@/components/label-pill';
 import { ActivityFeed } from '@/components/activity-feed';
@@ -35,48 +35,32 @@ const COLOR_DOT: Record<string, string> = {
 function AddSubtaskInput({ onAdd }: { onAdd: (title: string) => Promise<unknown> }) {
   const [text, setText] = useState('');
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
 
   const submit = async () => {
     if (!text.trim()) return;
     setAdding(true);
-    setError(null);
-    try {
-      const result = await onAdd(text.trim());
-      // Check if result is an error object returned by createSubtask
-      if (result && typeof result === 'object' && 'error' in result && (result as any).error) {
-        setError((result as any).error);
-        setAdding(false);
-        return;
-      }
-      setText('');
-    } catch (e) {
-      setError(e instanceof Error ? e.message : 'Failed to add subtask');
-    } finally {
-      setAdding(false);
-    }
+    await onAdd(text.trim());
+    setText('');
+    setAdding(false);
   };
 
   return (
-    <div className="flex flex-col gap-2 mt-2">
-      <div className="flex gap-2">
-        <input
-          value={text}
-          onChange={e => setText(e.target.value)}
-          onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
-          placeholder="Add a subtask..."
-          className="flex-1 px-2 py-1 text-xs rounded-md bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-        />
-        <button
-          type="button"
-          disabled={!text.trim() || adding}
-          onClick={submit}
-          className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
-        >
-          Add
-        </button>
-      </div>
-      {error && <p className="text-xs text-red-400">{error}</p>}
+    <div className="flex gap-2 mt-2">
+      <input
+        value={text}
+        onChange={e => setText(e.target.value)}
+        onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); submit(); } }}
+        placeholder="Add a subtask..."
+        className="flex-1 px-2 py-1 text-xs rounded-md bg-input border border-border outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+      />
+      <button
+        type="button"
+        disabled={!text.trim() || adding}
+        onClick={submit}
+        className="px-2 py-1 text-xs rounded-md bg-primary text-primary-foreground disabled:opacity-50 hover:opacity-90 transition-opacity"
+      >
+        Add
+      </button>
     </div>
   );
 }
@@ -186,13 +170,12 @@ interface Props {
   onRemoveDependency?: (blockerId: number, type?: string) => Promise<unknown>;
 }
 
-function BlockerBadge({ dep, onRemove }: { dep: { id: number; blocker: { id: number; title: string; issue_number?: number }; type?: string }; onRemove?: (blockerId: number, type?: string) => void }) {
-  const config = DEPENDENCY_TYPES.find(d => d.value === dep.type) ?? DEPENDENCY_TYPES[0];
+function BlockerBadge({ dep, onRemove }: { dep: { id: number; blocker: { id: number; title: string; issue_number?: number } }; onRemove?: (blockerId: number) => void }) {
   return (
-    <span className={`${config.badge || 'badge-blocked'} inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full`}>
-      {config.icon} #{dep.blocker.issue_number ?? dep.blocker.id} {dep.blocker.title}
+    <span className="badge-blocked inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full">
+      🔒 #{dep.blocker.issue_number ?? dep.blocker.id} {dep.blocker.title}
       {onRemove && (
-        <button type="button" onClick={() => onRemove(dep.blocker.id, dep.type)} className="hover:opacity-70 ml-0.5">×</button>
+        <button type="button" onClick={() => onRemove(dep.blocker.id)} className="hover:opacity-70 ml-0.5">×</button>
       )}
     </span>
   );
@@ -208,7 +191,6 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
   const [saveError, setSaveError] = useState<string | null>(null); // Fix K3
   const [subtasksOpen, setSubtasksOpen] = useState(false); // T2-3: collapsible
   const [blockersOpen, setBlockersOpen] = useState(false); // T2-3: collapsible, closed by default
-  const [depType, setDepType] = useState<DependencyType>('blocks');
   const reduceMotion = useReducedMotion();
   const motionDuration = reduceMotion ? 0 : 0.2;
   const [showAllActivity, setShowAllActivity] = useState(false);
@@ -534,34 +516,22 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
                     )}
                   </div>
                   {onAddDependency && (allTasks ?? []).filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id)).length > 0 && (
-                    <div className="flex gap-2">
-                      <select
-                        defaultValue=""
-                        onChange={async e => {
-                          if (!e.target.value) return;
-                          const result = await onAddDependency(parseInt(e.target.value), depType) as { error?: string | null } | void;
-                          if (result?.error) { setSaveError(result.error); return; }
-                          e.target.value = '';
-                        }}
-                        className="flex-1 px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-                      >
-                        <option value="">+ Add relationship…</option>
-                        {(allTasks ?? [])
-                          .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
-                          .map(t => <option key={t.id} value={t.id}>#{t.issue_number ?? t.id} {t.title}</option>)
-                        }
-                      </select>
-                      <select
-                        value={depType}
-                        onChange={e => setDepType(e.target.value as DependencyType)}
-                        className="w-28 px-2 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
-                        aria-label="Relationship type"
-                      >
-                        {DEPENDENCY_TYPES.map(dt => (
-                          <option key={dt.value} value={dt.value}>{dt.icon} {dt.label}</option>
-                        ))}
-                      </select>
-                    </div>
+                    <select
+                      defaultValue=""
+                      onChange={async e => {
+                        if (!e.target.value) return;
+                        const result = await onAddDependency(parseInt(e.target.value)) as { error?: string | null } | void;
+                        if (result?.error) { setSaveError(result.error); return; }
+                        e.target.value = '';
+                      }}
+                      className="w-full px-3 py-2 rounded-lg bg-input border border-border text-xs outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-colors"
+                    >
+                      <option value="">+ Add blocker…</option>
+                      {(allTasks ?? [])
+                        .filter(t => t.id !== task.id && !(task.blockedBy ?? []).find(d => d.blockerId === t.id))
+                        .map(t => <option key={t.id} value={t.id}>#{t.issue_number ?? t.id} {t.title}</option>)
+                      }
+                    </select>
                   )}
                 </>
               )}
@@ -593,14 +563,11 @@ export function TaskEditModal({ task, onSave, onClose, labels = [], onAddLabel, 
               </button>
               <div id="blocks-section" style={{ display: 'none' }}>
                 <div className="flex flex-wrap gap-1.5 mb-2">
-                  {(task.blocking ?? []).map(dep => {
-                    const depConfig = DEPENDENCY_TYPES.find(d => d.value === dep.type) ?? DEPENDENCY_TYPES[0];
-                    return (
-                    <span key={dep.id} className={`${depConfig.badge || 'badge-info'} inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full`}>
-                      {depConfig.icon} #{dep.blocked?.issue_number ?? dep.blocked?.id} {dep.blocked?.title}
+                  {(task.blocking ?? []).map(dep => (
+                    <span key={dep.id} className="badge-info inline-flex items-center gap-1 text-xs px-2 py-0.5 rounded-full">
+                      🚫 #{dep.blocked?.issue_number ?? dep.blocked?.id} {dep.blocked?.title}
                     </span>
-                    );
-                  })}
+                  ))}
                   {(task.blocking ?? []).length === 0 && (
                     <p className="text-xs text-muted-foreground/50 italic">This task doesn't block anything.</p>
                   )}

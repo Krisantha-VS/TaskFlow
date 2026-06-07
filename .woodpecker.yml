@@ -1,0 +1,18 @@
+when:
+  - event: push
+    branch: main
+
+steps:
+  - name: deploy
+    image: appleboy/drone-ssh
+    settings:
+      host: 84.247.162.197
+      username: root
+      key:
+        from_secret: SSH_PRIVATE_KEY
+      script:
+        - cd /opt/taskflow/app
+        - git pull origin main
+        - docker build --build-arg DATABASE_URL="postgresql://royalda:db1idnZUA8KusDUPkGImTUb6@postgres:5432/taskflow" -t taskflow:latest .
+        - docker compose -f /opt/taskflow/docker-compose.yml up -d --force-recreate
+        - docker image prune -f
