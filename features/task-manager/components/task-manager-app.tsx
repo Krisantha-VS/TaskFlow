@@ -93,71 +93,99 @@ function useOAuthAuth() {
   return { token, loading, initializing, login, logout };
 }
 
-// ─── Auth Gate ────────────────────────────────────────────────────────────────
+// ─── Landing Page ─────────────────────────────────────────────────────────────
 
 interface AuthGateProps {
   login: () => void;
   loading: boolean;
 }
 
+const FEATURES = [
+  { icon: '⚡', title: 'Instant boards', desc: 'Create and organise Kanban boards in seconds.' },
+  { icon: '🔒', title: 'Secure by default', desc: 'OAuth 2.0 PKCE authentication on every request.' },
+  { icon: '🌙', title: 'Light & dark', desc: 'Follows your system preference automatically.' },
+];
+
 function AuthGate({ login, loading }: AuthGateProps) {
   const authError = typeof window !== 'undefined'
     ? new URLSearchParams(window.location.search).get('auth_error')
     : null;
 
-  useEffect(() => {
-    if (!authError) login();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
-    <div className="min-h-[calc(100vh-3rem)] flex items-center justify-center p-6">
-      <div className="glass rounded-2xl p-8 w-full max-w-sm border border-border">
-        <div className="flex items-center gap-3 mb-8">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-600 to-purple-500 flex items-center justify-center">
-            <Kanban className="w-5 h-5 text-white" />
+    <div className="min-h-screen flex flex-col">
+      {/* Nav */}
+      <header className="flex items-center justify-between px-6 py-4 border-b border-border/50">
+        <div className="flex items-center gap-2.5">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-violet-600 to-purple-500 flex items-center justify-center">
+            <Kanban className="w-4 h-4 text-white" />
           </div>
-          <div>
-            <h1 className="text-lg font-bold">TaskFlow</h1>
-            <p className="text-xs text-muted-foreground">Kanban task manager</p>
-          </div>
+          <span className="font-semibold text-sm">TaskFlow</span>
+        </div>
+        <button
+          type="button"
+          disabled={loading}
+          onClick={login}
+          className="px-4 py-1.5 rounded-lg bg-primary text-white text-sm font-medium
+                     hover:opacity-90 transition-opacity disabled:opacity-50
+                     flex items-center gap-2"
+        >
+          {loading
+            ? <><span className="w-3.5 h-3.5 rounded-full border-2 border-white/30 border-t-white animate-spin" />Redirecting…</>
+            : 'Sign in'}
+        </button>
+      </header>
+
+      {/* Hero */}
+      <main className="flex-1 flex flex-col items-center justify-center px-6 py-20 text-center">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-600 to-purple-500 flex items-center justify-center mb-6 shadow-lg shadow-violet-500/25">
+          <Kanban className="w-8 h-8 text-white" />
         </div>
 
+        <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
+          Your tasks,{' '}
+          <span className="bg-gradient-to-r from-violet-500 to-purple-400 bg-clip-text text-transparent">
+            beautifully organised
+          </span>
+        </h1>
+
+        <p className="text-muted-foreground text-lg max-w-md mb-8">
+          A minimal Kanban board for teams who want clarity without complexity.
+        </p>
+
         {authError && (
-          <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-3 py-2 mb-4 text-center font-mono">
+          <p className="text-xs text-destructive bg-destructive/10 rounded-lg px-4 py-2 mb-4 font-mono">
             {authError}
           </p>
         )}
-
-        <p className="text-sm text-muted-foreground mb-6 text-center">
-          Sign in to access your boards
-        </p>
 
         <button
           type="button"
           disabled={loading}
           onClick={login}
-          className="w-full py-2.5 rounded-lg bg-primary text-white text-sm font-medium
-                     hover:opacity-90 transition-opacity disabled:opacity-50
-                     flex items-center justify-center gap-2"
+          className="px-6 py-3 rounded-xl bg-primary text-white text-sm font-semibold
+                     hover:opacity-90 transition-all disabled:opacity-50 shadow-lg shadow-primary/25
+                     flex items-center gap-2"
         >
-          {loading ? (
-            <>
-              <span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />
-              Redirecting…
-            </>
-          ) : (
-            'Sign in'
-          )}
+          {loading
+            ? <><span className="w-4 h-4 rounded-full border-2 border-white/30 border-t-white animate-spin" />Redirecting…</>
+            : <>Get started — it&apos;s free <ChevronRight className="w-4 h-4" /></>}
         </button>
 
-        <p className="text-center text-xs text-muted-foreground/50 mt-6">
-          Secured by{' '}
-          <a href="/explore" className="hover:text-muted-foreground transition-colors">
-            AuthSaas
-          </a>
-        </p>
-      </div>
+        {/* Features */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mt-20 max-w-2xl w-full text-left">
+          {FEATURES.map(f => (
+            <div key={f.title} className="glass rounded-xl p-4 border border-border">
+              <div className="text-2xl mb-2">{f.icon}</div>
+              <p className="text-sm font-semibold mb-1">{f.title}</p>
+              <p className="text-xs text-muted-foreground">{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </main>
+
+      <footer className="text-center text-xs text-muted-foreground/40 py-4">
+        Secured by AuthSaaS
+      </footer>
     </div>
   );
 }
