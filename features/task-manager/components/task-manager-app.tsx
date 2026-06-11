@@ -105,6 +105,11 @@ function AuthGate({ login, loading }: AuthGateProps) {
     ? new URLSearchParams(window.location.search).get('auth_error')
     : null;
 
+  useEffect(() => {
+    if (!authError) login();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="min-h-[calc(100vh-3rem)] flex items-center justify-center p-6">
       <div className="glass rounded-2xl p-8 w-full max-w-sm border border-border">
